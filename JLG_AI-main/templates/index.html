@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#07070a">
+  <title>JLG AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/styles/atom-one-dark.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
+</head>
+<body>
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-panel" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M4 5h16v14H4zM9.5 5v14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m20 20-4.2-4.2M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zM18.5 11.5a6.5 6.5 0 0 1-13 0M12 18v3"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M9 9h11v11H9zM5 15H4V4h11v1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+  <symbol id="i-memory" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M6 3h8l4 4v14H6zM14 3v4h4"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="m2 9 10-5 10 5-10 5zM6 11v5c3 2.5 9 2.5 12 0v-5"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></symbol>
+  <symbol id="i-rocket" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M14 4c3-1 5-1 6 0 1 1 1 3 0 6l-6 6-6-6zM8 10l-4 1 3 3M14 16l-1 4-3-3M15.5 8.5h.01"/></symbol>
+</svg>
+
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+
+<div class="app" id="app">
+  <!-- ============ Barra lateral ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="side-head">
+      <div class="brand"><span class="orb orb-xs"></span><span class="brand-name">JLG<em>AI</em></span></div>
+      <button class="icon-btn" id="toggleSidebar" title="Ocultar panel"><svg><use href="#i-panel"/></svg></button>
+    </div>
+
+    <button class="new-chat" id="newChat">
+      <svg><use href="#i-plus"/></svg><span>Nuevo chat</span><kbd id="kbdNew">⌘K</kbd>
+    </button>
+
+    <label class="search">
+      <svg><use href="#i-search"/></svg>
+      <input id="searchConv" placeholder="Buscar chats" autocomplete="off">
+    </label>
+
+    <nav class="conv-list" id="convList"></nav>
+
+    <div class="side-foot">
+      <button class="side-item" id="openMemory"><svg><use href="#i-memory"/></svg><span>Mi memoria</span><b id="memCount"></b></button>
+      <div class="user-row">
+        <div class="avatar">{{ usuario.nombre[0]|upper }}</div>
+        <div class="user-info"><strong>{{ usuario.nombre }}</strong><small>{{ 'Administrador' if usuario.es_admin else 'Usuario' }}</small></div>
+        <a class="icon-btn" href="/logout" title="Cerrar sesión"><svg><use href="#i-logout"/></svg></a>
+      </div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ============ Zona principal ============ -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="openSidebar" title="Mostrar panel"><svg><use href="#i-panel"/></svg></button>
+      <div class="topbar-title" id="topTitle">Nuevo chat</div>
+      <div class="mode" id="mode" title="Rápido: responde en 1-2 s · Avanzado: más profundo, puede tardar">
+        <button data-m="rapido">Rápido</button><button data-m="avanzado">Avanzado</button><span class="mode-pill"></span>
+      </div>
+    </header>
+
+    <section class="chat" id="chat">
+      <div class="welcome" id="welcome">
+        <div class="orb orb-xl" id="heroOrb"></div>
+        <h1><span id="saludo">Hola</span>, <span class="accent">{{ usuario.nombre.split(' ')[0]|capitalize }}</span></h1>
+        <p class="welcome-sub">Pregúntame, háblame o enséñame una imagen.</p>
+        <div class="cards">
+          <button class="card" data-q="Dame 5 ideas originales para un video sobre inteligencia artificial">
+            <span class="card-ic"><svg><use href="#i-bulb"/></svg></span><b>Ideas para videos</b><small>5 ideas sobre IA listas para grabar</small></button>
+          <button class="card" data-q="Explícame cómo funciona una red neuronal como si tuviera 10 años">
+            <span class="card-ic"><svg><use href="#i-cap"/></svg></span><b>Aprender algo</b><small>Redes neuronales, fácil y rápido</small></button>
+          <button class="card" data-q="Ayúdame a organizar mi semana con bloques de tiempo">
+            <span class="card-ic"><svg><use href="#i-cal"/></svg></span><b>Organizar mi semana</b><small>Plan por bloques de tiempo</small></button>
+          {% if apps_locales %}
+          <button class="card" data-q="Abre YouTube">
+            <span class="card-ic"><svg><use href="#i-rocket"/></svg></span><b>Abrir una app</b><small>"Abre YouTube", "abre la calculadora"…</small></button>
+          {% else %}
+          <button class="card" data-q="¿Qué recuerdas de mí?">
+            <span class="card-ic"><svg><use href="#i-memory"/></svg></span><b>Mi memoria</b><small>¿Qué sabe JLG AI de ti?</small></button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="messages" id="messages"></div>
+    </section>
+
+    <footer class="dock-wrap">
+      <div class="dock" id="dock">
+        <div class="attach-preview" id="attachPreview" hidden>
+          <div class="attach-thumb" id="attachThumb"></div>
+          <span id="attachName"></span>
+          <button class="icon-btn tiny" id="removeAttach" title="Quitar"><svg><use href="#i-close"/></svg></button>
+        </div>
+        <div class="wave" id="wave" hidden></div>
+        <textarea id="input" rows="1" placeholder="Escribe a JLG AI…"></textarea>
+        <div class="dock-row">
+          <input type="file" id="fileInput" accept="image/*,application/pdf,text/plain,audio/*" hidden>
+          <button class="icon-btn" id="attachBtn" title="Adjuntar archivo"><svg><use href="#i-clip"/></svg></button>
+          <button class="icon-btn" id="micBtn" title="Hablar"><svg><use href="#i-mic"/></svg></button>
+          <span class="rec-label" id="recLabel" hidden>Escuchando · toca para parar</span>
+          <div class="spacer"></div>
+          <button class="send-btn" id="sendBtn" title="Enviar" disabled><svg><use href="#i-arrow"/></svg></button>
+        </div>
+      </div>
+      <p class="hint"><kbd>Enter</kbd> enviar · <kbd>Shift</kbd>+<kbd>Enter</kbd> nueva línea · JLG AI puede equivocarse</p>
+    </footer>
+  </main>
+</div>
+
+<!-- ============ Modal de memoria ============ -->
+<dialog class="modal" id="memoryModal">
+  <div class="modal-head">
+    <span class="orb orb-sm"></span>
+    <div><h2>Mi memoria</h2><p>Lo que JLG AI sabe de ti y usa en todos tus chats.</p></div>
+    <button class="icon-btn" id="closeMemory"><svg><use href="#i-close"/></svg></button>
+  </div>
+  <ul class="memory-list" id="memoryList"></ul>
+  <form class="memory-add" id="memoryForm">
+    <input id="memoryInput" placeholder="Añade algo: «Prefiero respuestas cortas»" maxlength="500">
+    <button class="btn-primary" type="submit">Guardar</button>
+  </form>
+  <button class="link-danger" id="clearMemory">Borrar toda la memoria</button>
+</dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const state = { convId: null, file: null, controller: null, busy: false, convs: [] };
+const esMac = /Mac|iPhone|iPad/.test(navigator.platform);
+$('#kbdNew').textContent = esMac ? '⌘K' : 'Ctrl K';
+
+marked.setOptions({ breaks: true, gfm: true });
+const renderMD = (t) => {
+  try { return DOMPurify.sanitize(marked.parse(t || '')); }
+  catch { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+};
+
+// Saludo según la hora
+const h = new Date().getHours();
+$('#saludo').textContent = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+
+async function api(url, opts = {}) {
+  const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (r.status === 401) { location.href = '/login'; return; }
+  return r.json();
+}
+
+// ---------------------------------------------------------- barra lateral
+function grupoFecha(iso) {
+  const d = new Date(iso), hoy = new Date();
+  const dias = Math.floor((new Date(hoy.toDateString()) - new Date(d.toDateString())) / 864e5);
+  if (dias <= 0) return 'Hoy';
+  if (dias === 1) return 'Ayer';
+  if (dias < 7) return 'Últimos 7 días';
+  if (dias < 30) return 'Este mes';
+  return 'Antes';
+}
+
+async function cargarConversaciones() {
+  state.convs = await api('/api/conversaciones') || [];
+  pintarLista();
+}
+
+function pintarLista() {
+  const filtro = $('#searchConv').value.trim().toLowerCase();
+  const list = $('#convList');
+  list.innerHTML = '';
+  let grupoActual = null;
+  const convs = state.convs.filter(c => !filtro || c.titulo.toLowerCase().includes(filtro));
+  if (!convs.length) list.innerHTML = `<p class="empty-list">${filtro ? 'Sin resultados' : 'Aún no tienes chats'}</p>`;
+  convs.forEach(c => {
+    const g = grupoFecha(c.actualizado);
+    if (g !== grupoActual) {
+      grupoActual = g;
+      const t = document.createElement('div'); t.className = 'group'; t.textContent = g; list.appendChild(t);
+    }
+    const item = document.createElement('div');
+    item.className = 'conv-item' + (c.id === state.convId ? ' active' : '');
+    item.innerHTML = `<span class="conv-title"></span>
+      <button class="icon-btn tiny" data-act="ren" title="Renombrar"><svg><use href="#i-edit"/></svg></button>
+      <button class="icon-btn tiny" data-act="del" title="Eliminar"><svg><use href="#i-trash"/></svg></button>`;
+    item.querySelector('.conv-title').textContent = c.titulo;
+    item.onclick = async (e) => {
+      const act = e.target.closest('button')?.dataset.act;
+      if (act === 'del') {
+        if (!confirm('¿Eliminar este chat?')) return;
+        await api(`/api/conversaciones/${c.id}`, { method: 'DELETE' });
+        if (state.convId === c.id) nuevaConversacion();
+        return cargarConversaciones();
+      }
+      if (act === 'ren') {
+        const t = prompt('Nuevo nombre', c.titulo);
+        if (t) { await api(`/api/conversaciones/${c.id}`, { method: 'PATCH', body: JSON.stringify({ titulo: t }) }); cargarConversaciones(); }
+        return;
+      }
+      abrirConversacion(c.id);
+    };
+    list.appendChild(item);
+  });
+}
+$('#searchConv').addEventListener('input', pintarLista);
+
+async function abrirConversacion(id) {
+  if (state.busy) return;
+  const data = await api(`/api/conversaciones/${id}`);
+  state.convId = id;
+  $('#topTitle').textContent = data.titulo;
+  $('#messages').innerHTML = '';
+  $('#welcome').hidden = true;
+  data.mensajes.forEach(m => m.rol === 'user' ? burbujaUsuario(m.contenido, m.adjunto) : burbujaModelo(m.contenido));
+  cerrarSidebarMovil();
+  pintarLista();
+  scrollAbajo(true);
+}
+
+function nuevaConversacion() {
+  if (state.busy) return;
+  state.convId = null;
+  $('#topTitle').textContent = 'Nuevo chat';
+  $('#messages').innerHTML = '';
+  $('#welcome').hidden = false;
+  pintarLista();
+  cerrarSidebarMovil();
+  input.focus();
+}
+
+$('#newChat').onclick = nuevaConversacion;
+$('#toggleSidebar').onclick = () => $('#app').classList.add('collapsed');
+$('#openSidebar').onclick = () => {
+  if (matchMedia('(max-width: 820px)').matches) $('#app').classList.add('mobile-open');
+  else $('#app').classList.remove('collapsed');
+};
+$('#scrim').onclick = cerrarSidebarMovil;
+function cerrarSidebarMovil() { $('#app').classList.remove('mobile-open'); }
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); nuevaConversacion(); }
+});
+
+// ---------------------------------------------------------- mensajes
+function scrollAbajo(forzar) {
+  const c = $('#chat');
+  if (forzar || c.scrollHeight - c.scrollTop - c.clientHeight < 160) c.scrollTop = c.scrollHeight;
+}
+
+function burbujaUsuario(texto, adjunto, previewURL) {
+  const row = document.createElement('div');
+  row.className = 'msg user';
+  if (previewURL) row.innerHTML += `<img class="msg-img" src="${previewURL}" alt="">`;
+  else if (adjunto) row.innerHTML += `<div class="msg-file"><svg><use href="#i-file"/></svg><span></span></div>`;
+  if (adjunto && !previewURL) row.querySelector('.msg-file span').textContent = adjunto;
+  if (texto) { const b = document.createElement('div'); b.className = 'bubble'; b.textContent = texto; row.appendChild(b); }
+  $('#messages').appendChild(row);
+  return row;
+}
+
+const FRASES = ['Pensando', 'Conectando ideas', 'Buscando la mejor respuesta', 'Casi listo'];
+
+function burbujaModelo(texto) {
+  const row = document.createElement('div');
+  row.className = 'msg model';
+  row.innerHTML = `<div class="model-head"><span class="orb orb-xs"></span><b>JLG AI</b><span class="think-text"></span></div>
+    <div class="md"></div>
+    <div class="msg-actions">
+      <button class="act" data-act="copy" title="Copiar"><svg><use href="#i-copy"/></svg><span>Copiar</span></button>
+      <button class="act" data-act="speak" title="Escuchar"><svg><use href="#i-volume"/></svg><span>Escuchar</span></button>
+    </div>`;
+  row._texto = texto || '';
+  pintar(row, row._texto);
+  const copy = row.querySelector('[data-act=copy]');
+  copy.onclick = () => {
+    navigator.clipboard.writeText(row._texto);
+    copy.querySelector('use').setAttribute('href', '#i-check'); copy.querySelector('span').textContent = 'Copiado';
+    setTimeout(() => { copy.querySelector('use').setAttribute('href', '#i-copy'); copy.querySelector('span').textContent = 'Copiar'; }, 1500);
+  };
+  row.querySelector('[data-act=speak]').onclick = (e) => leerEnVoz(row._texto, e.currentTarget);
+  $('#messages').appendChild(row);
+  return row;
+}
+
+function empezarPensar(row) {
+  row.classList.add('thinking');
+  let i = 0;
+  const t = row.querySelector('.think-text');
+  t.textContent = FRASES[0] + '…';
+  row._timer = setInterval(() => { i = (i + 1) % FRASES.length; t.textContent = FRASES[i] + '…'; }, 2200);
+}
+function terminarPensar(row) {
+  row.classList.remove('thinking');
+  clearInterval(row._timer);
+  row.querySelector('.think-text').textContent = '';
+}
+
+function pintar(row, texto) {
+  const md = row.querySelector('.md');
+  md.innerHTML = renderMD(texto);
+  md.querySelectorAll('pre code').forEach(b => {
+    try { window.hljs && hljs.highlightElement(b); } catch {}
+    const pre = b.parentElement;
+    const lang = (b.className.match(/language-(\w+)/) || [])[1] || 'código';
+    const bar = document.createElement('div');
+    bar.className = 'code-bar';
+    bar.innerHTML = `<span>${lang}</span><button>Copiar</button>`;
+    bar.querySelector('button').onclick = (ev) => {
+      navigator.clipboard.writeText(b.innerText);
+      ev.target.textContent = 'Copiado ✓'; setTimeout(() => ev.target.textContent = 'Copiar', 1500);
+    };
+    pre.prepend(bar);
+  });
+  md.querySelectorAll('a').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+}
+
+function leerEnVoz(texto, btn) {
+  if (speechSynthesis.speaking) { speechSynthesis.cancel(); btn.classList.remove('on'); return; }
+  const limpio = texto.replace(/```[\s\S]*?```/g, ' (bloque de código) ').replace(/[*#_`>|]/g, '');
+  const u = new SpeechSynthesisUtterance(limpio);
+  u.lang = 'es-ES';
+  const voz = speechSynthesis.getVoices().find(v => v.lang.startsWith('es'));
+  if (voz) u.voice = voz;
+  u.onend = () => btn.classList.remove('on');
+  btn.classList.add('on');
+  speechSynthesis.speak(u);
+}
+
+// ---------------------------------------------------------- enviar
+const input = $('#input');
+function actualizarBoton() {
+  $('#sendBtn').disabled = !state.busy && !input.value.trim() && !state.file;
+}
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 220) + 'px';
+  actualizarBoton();
+});
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar(); }
+});
+$('#sendBtn').onclick = () => state.busy ? state.controller?.abort() : enviar();
+document.querySelectorAll('.card').forEach(c => c.onclick = () => { input.value = c.dataset.q; enviar(); });
+
+function modoOcupado(on) {
+  state.busy = on;
+  $('#sendBtn').innerHTML = `<svg><use href="#i-${on ? 'stop' : 'arrow'}"/></svg>`;
+  $('#sendBtn').title = on ? 'Detener' : 'Enviar';
+  $('#sendBtn').classList.toggle('stop', on);
+  document.body.classList.toggle('busy', on);
+  actualizarBoton();
+}
+
+async function enviar() {
+  const texto = input.value.trim();
+  if (state.busy || (!texto && !state.file)) return;
+  if (reconociendo) detenerMic();
+
+  $('#welcome').hidden = true;
+  const file = state.file;
+  const preview = file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+  burbujaUsuario(texto, file ? (file.name || 'imagen') : null, preview);
+  if (!state.convId) $('#topTitle').textContent = (texto || 'Archivo').slice(0, 60);
+
+  const fd = new FormData();
+  fd.append('message', texto);
+  if (file) fd.append('file', file, file.name || 'imagen-pegada.png');
+  if (state.convId) fd.append('conversacion_id', state.convId);
+  fd.append('modo', modo);
+
+  input.value = ''; input.style.height = 'auto';
+  quitarAdjunto();
+
+  const row = burbujaModelo('');
+  empezarPensar(row);
+  scrollAbajo(true);
+  modoOcupado(true);
+  state.controller = new AbortController();
+
+  let acumulado = '';
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', body: fd, signal: state.controller.signal });
+    if (res.status === 401) return location.href = '/login';
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error ${res.status}`);
+    }
+    const eraNueva = !state.convId;
+    state.convId = Number(res.headers.get('X-Conversacion-Id'));
+    if (eraNueva) cargarConversaciones();
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let pendiente = false;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      acumulado += dec.decode(value, { stream: true });
+      terminarPensar(row);
+      row._texto = acumulado;
+      if (!pendiente) {
+        pendiente = true;
+        requestAnimationFrame(() => { pintar(row, row._texto); scrollAbajo(); pendiente = false; });
+      }
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') acumulado += `\n\n⚠️ ${e.message || 'No se pudo conectar con el servidor.'}`;
+    else acumulado += '\n\n_(respuesta detenida)_';
+  } finally {
+    terminarPensar(row);
+    row._texto = acumulado || '⚠️ Sin respuesta.';
+    pintar(row, row._texto);
+    modoOcupado(false);
+    scrollAbajo();
+    input.focus();
+    setTimeout(contarMemoria, 15000); // la memoria se actualiza en segundo plano
+  }
+}
+
+// ---------------------------------------------------------- adjuntos
+const fileInput = $('#fileInput');
+$('#attachBtn').onclick = () => fileInput.click();
+fileInput.onchange = () => fileInput.files[0] && ponerAdjunto(fileInput.files[0]);
+$('#removeAttach').onclick = quitarAdjunto;
+input.addEventListener('paste', (e) => {
+  const f = [...(e.clipboardData?.items || [])].find(i => i.kind === 'file')?.getAsFile();
+  if (f) { e.preventDefault(); ponerAdjunto(f); }
+});
+document.addEventListener('dragover', (e) => { e.preventDefault(); $('#dock').classList.add('drop'); });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) $('#dock').classList.remove('drop'); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault(); $('#dock').classList.remove('drop');
+  if (e.dataTransfer.files[0]) ponerAdjunto(e.dataTransfer.files[0]);
+});
+
+function ponerAdjunto(f) {
+  if (f.size > 15 * 1024 * 1024) return alert('El archivo supera 15 MB.');
+  state.file = f;
+  $('#attachThumb').innerHTML = f.type.startsWith('image/')
+    ? `<img src="${URL.createObjectURL(f)}" alt="">` : '<svg><use href="#i-file"/></svg>';
+  $('#attachName').textContent = f.name || 'Imagen pegada';
+  $('#attachPreview').hidden = false;
+  actualizarBoton();
+  input.focus();
+}
+function quitarAdjunto() {
+  state.file = null; fileInput.value = '';
+  $('#attachPreview').hidden = true;
+  actualizarBoton();
+}
+
+// ---------------------------------------------------------- micrófono + onda de voz
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let reconociendo = false, rec = null, mediaRec = null, base = '';
+let audioCtx = null, analizador = null, streamVoz = null, rafOnda = null;
+
+const wave = $('#wave');
+for (let i = 0; i < 28; i++) wave.appendChild(document.createElement('i'));
+
+$('#micBtn').onclick = () => reconociendo ? detenerMic() : iniciarMic();
+
+function marcarMic(on) {
+  reconociendo = on;
+  $('#micBtn').classList.toggle('recording', on);
+  $('#recLabel').hidden = !on;
+  wave.hidden = !on;
+  document.body.classList.toggle('listening', on);
+  if (!on) pararOnda();
+}
+
+async function empezarOnda(stream) {
+  try {
+    streamVoz = stream || await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analizador = audioCtx.createAnalyser();
+    analizador.fftSize = 64;
+    audioCtx.createMediaStreamSource(streamVoz).connect(analizador);
+    const datos = new Uint8Array(analizador.frequencyBinCount);
+    const barras = [...wave.children];
+    const tick = () => {
+      analizador.getByteFrequencyData(datos);
+      let suma = 0;
+      barras.forEach((b, i) => {
+        const v = datos[(i % (datos.length - 2)) + 1] / 255;
+        suma += v;
+        b.style.transform = `scaleY(${0.12 + v * 0.95})`;
+      });
+      document.documentElement.style.setProperty('--lvl', (suma / barras.length).toFixed(3));
+      rafOnda = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch { /* la onda es decorativa: si falla, el dictado sigue */ }
+}
+function pararOnda() {
+  cancelAnimationFrame(rafOnda);
+  if (!mediaRec || mediaRec.state === 'inactive') streamVoz?.getTracks().forEach(t => t.stop());
+  audioCtx?.close().catch(() => {});
+  audioCtx = analizador = null;
+  document.documentElement.style.setProperty('--lvl', 0);
+}
+
+async function iniciarMic() {
+  if (SR) {
+    rec = new SR();
+    rec.lang = 'es-ES';
+    rec.continuous = true;
+    rec.interimResults = true;
+    base = input.value ? input.value.trim() + ' ' : '';
+    rec.onresult = (e) => {
+      let finales = '', parcial = '';
+      for (const r of e.results) (r.isFinal ? (finales += r[0].transcript) : (parcial += r[0].transcript));
+      input.value = base + finales + parcial;
+      input.dispatchEvent(new Event('input'));
+    };
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed') alert('Permite el acceso al micrófono en tu navegador (requiere HTTPS o localhost).');
+      else if (e.error === 'network') { detenerMic(); return iniciarGrabacion(); }
+    };
+    rec.onend = () => marcarMic(false);
+    try { rec.start(); marcarMic(true); empezarOnda(); } catch { iniciarGrabacion(); }
+  } else {
+    iniciarGrabacion();
+  }
+}
+
+// Respaldo (Firefox y otros): grabar y transcribir con Gemini
+async function iniciarGrabacion() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const trozos = [];
+    mediaRec = new MediaRecorder(stream);
+    mediaRec.ondataavailable = (e) => trozos.push(e.data);
+    mediaRec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      marcarMic(false);
+      const blob = new Blob(trozos, { type: mediaRec.mimeType || 'audio/webm' });
+      const fd = new FormData();
+      fd.append('audio', blob, 'voz.webm');
+      input.placeholder = 'Transcribiendo tu voz…';
+      const r = await fetch('/api/transcribir', { method: 'POST', body: fd }).then(r => r.json()).catch(() => ({}));
+      input.placeholder = 'Escribe a JLG AI…';
+      if (r.texto) { input.value = (input.value ? input.value + ' ' : '') + r.texto; input.dispatchEvent(new Event('input')); input.focus(); }
+    };
+    mediaRec.start();
+    marcarMic(true);
+    empezarOnda(stream);
+  } catch {
+    alert('No se pudo usar el micrófono. Revisa los permisos (requiere HTTPS o localhost).');
+  }
+}
+
+function detenerMic() {
+  if (rec) { rec.stop(); rec = null; }
+  if (mediaRec && mediaRec.state !== 'inactive') mediaRec.stop();
+  marcarMic(false);
+}
+
+// ---------------------------------------------------------- memoria
+const modal = $('#memoryModal');
+$('#openMemory').onclick = async () => { await cargarMemoria(); modal.showModal(); cerrarSidebarMovil(); };
+$('#closeMemory').onclick = () => modal.close();
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+
+async function contarMemoria() {
+  const items = await api('/api/memoria') || [];
+  $('#memCount').textContent = items.length || '';
+  return items;
+}
+async function cargarMemoria() {
+  const items = await contarMemoria();
+  const ul = $('#memoryList');
+  ul.innerHTML = items.length ? '' : '<li class="empty">Todavía no sé nada de ti. Cuéntame cosas en el chat y las iré guardando.</li>';
+  items.forEach(m => {
+    const li = document.createElement('li');
+    li.innerHTML = `<i></i><span></span><button class="icon-btn tiny" title="Olvidar"><svg><use href="#i-trash"/></svg></button>`;
+    li.querySelector('span').textContent = m.contenido;
+    li.querySelector('button').onclick = async () => { await api(`/api/memoria/${m.id}`, { method: 'DELETE' }); cargarMemoria(); };
+    ul.appendChild(li);
+  });
+}
+$('#memoryForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const v = $('#memoryInput').value.trim();
+  if (!v) return;
+  await api('/api/memoria', { method: 'POST', body: JSON.stringify({ contenido: v }) });
+  $('#memoryInput').value = '';
+  cargarMemoria();
+};
+$('#clearMemory').onclick = async () => {
+  if (!confirm('¿Borrar todo lo que JLG AI recuerda de ti?')) return;
+  await api('/api/memoria', { method: 'DELETE' });
+  cargarMemoria();
+};
+
+// ---------------------------------------------------------- modo Rápido / Avanzado
+let modo = localStorage.getItem('jlg-modo') || 'rapido';
+function ponerModo(m) {
+  modo = m; localStorage.setItem('jlg-modo', m);
+  $('#mode').dataset.modo = m;
+  document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+}
+document.querySelectorAll('#mode button').forEach(b => b.onclick = () => ponerModo(b.dataset.m));
+ponerModo(modo);
+
+// ---------------------------------------------------------- inicio
+cargarConversaciones();
+contarMemoria();
+input.focus();
+</script>
+</body>
+</html>

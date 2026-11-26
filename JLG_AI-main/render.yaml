@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: jlg-ai
+    runtime: python
+    plan: free
+    region: virginia  # misma zona que la base de datos de Supabase (us-east-1)
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --worker-class gthread --workers 1 --threads 8 --timeout 120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.4"
+      - key: GEMINI_API_KEY
+        sync: false   # te lo pide Render al crear el servicio
+      - key: DATABASE_URL
+        sync: false   # la "Session pooler" de Supabase
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOW_REGISTRATION
+        value: "1"
+      - key: ENABLE_WEB_SEARCH
+        value: "1"

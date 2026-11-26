@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#07070a">
+  <title>{{ 'Crear cuenta' if modo == 'registro' else 'Entrar' }} · JLG AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-body">
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+  <div class="auth">
+    <section class="auth-hero">
+      <span class="orb"></span>
+      <h2>Tu asistente personal,<br><span class="accent">que te recuerda.</span></h2>
+      <p>Habla, escribe o enséñale una imagen. JLG AI aprende de ti en cada conversación para ayudarte mejor.</p>
+      <div class="auth-feats"><span>Voz</span><span>Memoria</span><span>Imágenes y PDF</span><span>Historial</span></div>
+    </section>
+
+    <section class="auth-side">
+      <main class="auth-card">
+        <div class="brand"><span class="orb orb-sm"></span><span class="brand-name">JLG<em>AI</em></span></div>
+        <h1>{{ 'Crea tu cuenta' if modo == 'registro' else 'Bienvenido de nuevo' }}</h1>
+        <p class="sub">{{ 'Solo toma un momento.' if modo == 'registro' else 'Entra para seguir donde lo dejaste.' }}</p>
+
+        {% if error %}<div class="auth-error">{{ error }}</div>{% endif %}
+
+        <form method="post" class="auth-form">
+          {% if modo == 'registro' %}
+          <label>Nombre<input name="nombre" required maxlength="80" autocomplete="name" value="{{ request.form.nombre or '' }}" placeholder="¿Cómo te llamas?"></label>
+          {% endif %}
+          <label>Correo<input name="email" type="email" required autocomplete="email" value="{{ request.form.email or '' }}" placeholder="tu@correo.com"></label>
+          <label>Contraseña<input name="password" type="password" required minlength="{{ 8 if modo == 'registro' else 1 }}" autocomplete="{{ 'new-password' if modo == 'registro' else 'current-password' }}" placeholder="{{ 'Mínimo 8 caracteres' if modo == 'registro' else '••••••••' }}"></label>
+          <button type="submit" class="btn-primary">{{ 'Crear cuenta' if modo == 'registro' else 'Entrar' }}</button>
+        </form>
+
+        {% if modo == 'login' and registro_abierto %}
+          <p class="auth-switch">¿No tienes cuenta? <a href="{{ url_for('registro') }}">Regístrate</a></p>
+        {% elif modo == 'registro' %}
+          <p class="auth-switch">¿Ya tienes cuenta? <a href="{{ url_for('login') }}">Inicia sesión</a></p>
+        {% endif %}
+      </main>
+    </section>
+  </div>
+</body>
+</html>
