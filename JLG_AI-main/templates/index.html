@@ -75,6 +75,32 @@
       background: rgba(139, 92, 246, 0.18);
       box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4);
     }
+    .msg.model .md img {
+      display: block;
+      max-width: 100%;
+      max-height: 440px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      margin: 8px 0 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+    .msg.model .md a[href^="/api/imagenes/"] {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: rgba(139, 92, 246, 0.18);
+      border: 1px solid rgba(139, 92, 246, 0.42);
+      color: #ddd6fe;
+      text-decoration: none;
+      font-size: 0.84rem;
+      font-weight: 500;
+      transition: background 0.18s ease;
+    }
+    .msg.model .md a[href^="/api/imagenes/"]:hover {
+      background: rgba(139, 92, 246, 0.32);
+    }
     @keyframes pulseBadge {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.45; transform: scale(0.85); }
@@ -154,12 +180,12 @@
       <div class="welcome" id="welcome">
         <div class="orb orb-xl" id="heroOrb"></div>
         <h1><span id="saludo">Hola</span>, <span class="accent">{{ usuario.nombre.split(' ')[0]|capitalize }}</span></h1>
-        <p class="welcome-sub">Pregúntame, háblame o enséñame tu pantalla.</p>
+        <p class="welcome-sub">Pregúntame, háblame, crea imágenes o enséñame tu pantalla.</p>
         <div class="cards">
           <button class="card" data-q="Mira mi pantalla y dime qué ves">
             <span class="card-ic"><svg><use href="#i-screen"/></svg></span><b>Mirar mi pantalla</b><small>Analiza lo que tienes abierto ahora</small></button>
-          <button class="card" data-q="Explícame cómo funciona una red neuronal como si tuviera 10 años">
-            <span class="card-ic"><svg><use href="#i-cap"/></svg></span><b>Aprender algo</b><small>Redes neuronales, fácil y rápido</small></button>
+          <button class="card" data-q="Genera una imagen de un estadio de fútbol futurista de noche">
+            <span class="card-ic"><svg><use href="#i-bulb"/></svg></span><b>Crear una imagen</b><small>Ilustraciones, logos y arte con IA</small></button>
           <button class="card" data-q="Ayúdame a organizar mi semana con bloques de tiempo">
             <span class="card-ic"><svg><use href="#i-cal"/></svg></span><b>Organizar mi semana</b><small>Plan por bloques de tiempo</small></button>
           {% if apps_locales %}
@@ -502,7 +528,11 @@ function pintar(row, texto) {
     };
     pre.prepend(bar);
   });
-  md.querySelectorAll('a').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+  md.querySelectorAll('a').forEach(a => {
+    a.target = '_blank';
+    a.rel = 'noopener';
+    if (a.getAttribute('href')?.includes('descargar=1')) a.setAttribute('download', '');
+  });
 }
 
 function leerEnVoz(texto, btn, alTerminar) {
@@ -514,9 +544,10 @@ function leerEnVoz(texto, btn, alTerminar) {
   speechSynthesis.cancel();
   const limpio = (texto || '')
     .replace(/```[\s\S]*?```/g, ' (bloque de código) ')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/https?:\/\/\S+/g, '')
-    .replace(/[*#_`>|]/g, '')
+    .replace(/[*#_`>|⬇️]/g, '')
     .trim();
 
   if (!limpio) {
@@ -808,7 +839,6 @@ async function empezarOnda(stream) {
       const lvl = suma / barras.length;
       document.documentElement.style.setProperty('--lvl', lvl.toFixed(3));
 
-      // Detección automática de silencio para el modo grabación de respaldo
       if (handsFree && mediaRec && mediaRec.state === 'recording') {
         if (lvl > 0.055) {
           habloAlgunaVez = true;
@@ -981,7 +1011,11 @@ ponerModo(modo);
 // ---------------------------------------------------------- inicio
 cargarConversaciones();
 contarMemoria();
-input.focus();
+if (new URLSearchParams(location.search).get('voz') === '1') {
+  setTimeout(() => activarManosLibres(), 350);
+} else {
+  input.focus();
+}
 </script>
 </body>
 </html>

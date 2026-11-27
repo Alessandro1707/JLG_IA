@@ -1,4 +1,5 @@
 """JLG AI — asistente con Gemini, usuarios, conversaciones, memoria y voz."""
+import base64
 import json
 import os
 import platform
@@ -14,7 +15,7 @@ from urllib.parse import quote, urlparse
 
 from dotenv import load_dotenv
 from flask import (Flask, Response, abort, jsonify, redirect, render_template, request,
-                   session, stream_with_context, url_for)
+                   send_from_directory, session, stream_with_context, url_for)
 from google import genai
 from google.genai import types
 
@@ -22,11 +23,15 @@ from database import (Conversacion, Mensaje, Recuerdo, Usuario, ahora, db,
                       importar_historial_antiguo, init_db)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+GENERATED_DIR = os.path.join(BASE_DIR, "generated_images")
+os.makedirs(GENERATED_DIR, exist_ok=True)
+
 load_dotenv(os.path.join(BASE_DIR, "api.env"))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 MODELO = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")          # modo Rápido
 MODELO_PRO = os.getenv("GEMINI_MODEL_PRO", "gemini-3.8-flash")        # modo Avanzado
+MODELO_IMAGEN = os.getenv("GEMINI_IMAGE_MODEL", "imagen-3.0-generate-002")
 BUSQUEDA_GOOGLE = os.getenv("ENABLE_GOOGLE_SEARCH", "0") == "1"
 BUSQUEDA_WEB = os.getenv("ENABLE_WEB_SEARCH", "1") == "1"  # búsqueda gratis con DuckDuckGo
 SISTEMA = platform.system()  # "Windows", "Darwin" (Mac) o "Linux"
@@ -59,7 +64,7 @@ init_db(app)
 
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY"),
-    http_options=types.HttpOptions(timeout=int(os.getenv("GEMINI_TIMEOUT_S", "15")) * 1000),
+    http_options=types.HttpOptions(timeout=int(os.getenv("GEMINI_TIMEOUT_S", "25")) * 1000),
 )
 
 
@@ -139,6 +144,13 @@ def logout():
 def index():
     u = usuario_actual()
     return render_template("index.html", usuario=u, apps_locales=APPS_LOCALES and u.es_admin)
+
+
+@app.get("/api/imagenes/<path:nombre>")
+@login_requerido
+def ver_imagen_generada(nombre):
+    descargar = request.args.get("descargar") == "1"
+    return send_from_directory(GENERATED_DIR, nombre, as_attachment=descargar)
 
 
 # ---------------------------------------------------------------- conversaciones
@@ -266,6 +278,121 @@ def extraer_recuerdos(uid, mensaje_usuario, respuesta):
             print(f"⚠️ No se pudo actualizar la memoria: {str(e)[:150]}", flush=True)
 
 
+# ---------------------------------------------------------------- generador de imágenes
+def sin_tildes(texto):
+    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
+
+
+def detectar_solicitud_imagen(texto):
+    """Detecta si el usuario pide generar o dibujar una imagen y devuelve la descripción."""
+    if not texto:
+        return None
+    original = texto.strip()
+    limpio = re.sub(r"[.!?¡¿,;]+$", "", sin_tildes(original.lower())).strip()
+
+    # Caso 1: "genera una imagen de ...", "crea un logo para ...", "hazme un wallpaper de ..."
+    m1 = re.match(
+        r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
+        r"(?:genera|generar|generame|crea|crear|creame|haz|hacer|hazme|disena|disenar|disename)\s+"
+        r"(?:una?\s+|el\s+|la\s+)?"
+        r"(imagen|foto|fotografia|ilustracion|dibujo|logo|logotipo|icono|avatar|wallpaper|fondo\s+de\s+pantalla|retrato|poster|banner|portada)\s+"
+        r"(?:de\s+|sobre\s+|con\s+|para\s+)?(.+)$",
+        limpio,
+    )
+    if m1:
+        tipo = m1.group(1).strip()
+        desc = re.sub(
+            r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
+            r"(?:genera|generar|genérame|generame|crea|crear|créame|creame|haz|hacer|hazme|diseña|disena|diseñar|disenar|diseñame|disename)\s+"
+            r"(?:una?\s+|el\s+|la\s+)?"
+            r"(?:imagen|foto|fotografía|fotografia|ilustración|ilustracion|dibujo|logo|logotipo|ícono|icono|avatar|wallpaper|fondo\s+de\s+pantalla|retrato|póster|poster|banner|portada)\s+"
+            r"(?:de\s+|sobre\s+|con\s+|para\s+)?",
+            "",
+            original,
+            flags=re.IGNORECASE,
+        ).strip()
+        if tipo in ("logo", "logotipo", "icono", "avatar", "wallpaper", "fondo de pantalla", "poster", "banner", "portada"):
+            return f"{tipo} de {desc}"
+        return desc
+
+    # Caso 2: "dibuja un ...", "dibújame una ...", "ilustra ..."
+    m2 = re.match(
+        r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
+        r"(?:dibuja|dibujar|dibujame|ilustra|ilustrar|ilustrame)\s+"
+        r"(?:una?\s+|el\s+|la\s+)?(.+)$",
+        limpio,
+    )
+    if m2:
+        desc = re.sub(
+            r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
+            r"(?:dibuja|dibujar|dibújame|dibujame|ilustra|ilustrar|ilústrame|ilustrame)\s+",
+            "",
+            original,
+            flags=re.IGNORECASE,
+        ).strip()
+        return desc
+
+    return None
+
+
+def generar_imagen_ia(prompt):
+    """Genera una imagen con Gemini/Imagen y devuelve (nombre_archivo, error)."""
+    errores = []
+    modelos_img = []
+    for m in [MODELO_IMAGEN, "imagen-3.0-generate-002", "imagen-3.0-fast-generate-001"]:
+        if m and m not in modelos_img:
+            modelos_img.append(m)
+
+    for m in modelos_img:
+        try:
+            res = client.models.generate_images(
+                model=m,
+                prompt=prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    output_mime_type="image/png",
+                ),
+            )
+            if getattr(res, "generated_images", None):
+                raw_data = res.generated_images[0].image.image_bytes
+                if isinstance(raw_data, str):
+                    raw_data = base64.b64decode(raw_data)
+                if raw_data:
+                    nombre = f"img_{int(time.time())}_{secrets.token_hex(4)}.png"
+                    with open(os.path.join(GENERATED_DIR, nombre), "wb") as f:
+                        f.write(raw_data)
+                    return nombre, None
+        except Exception as e:
+            errores.append(f"{m}: {str(e)[:140]}")
+
+    for m in ["gemini-2.5-flash-image", "gemini-2.0-flash-exp-image-generation"]:
+        try:
+            res = client.models.generate_content(
+                model=m,
+                contents=f"Genera una imagen de alta calidad: {prompt}",
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE", "TEXT"],
+                ),
+            )
+            for cand in (getattr(res, "candidates", None) or []):
+                for part in (getattr(cand.content, "parts", None) or []):
+                    inline = getattr(part, "inline_data", None)
+                    if inline and getattr(inline, "data", None):
+                        raw_data = inline.data
+                        if isinstance(raw_data, str):
+                            raw_data = base64.b64decode(raw_data)
+                        mime = getattr(inline, "mime_type", "") or "image/png"
+                        ext = "jpg" if "jpeg" in mime or "jpg" in mime else "png"
+                        nombre = f"img_{int(time.time())}_{secrets.token_hex(4)}.{ext}"
+                        with open(os.path.join(GENERATED_DIR, nombre), "wb") as f:
+                            f.write(raw_data)
+                        return nombre, None
+        except Exception as e:
+            errores.append(f"{m}: {str(e)[:140]}")
+
+    return None, (errores[0] if errores else "No se pudo generar la imagen.")
+
+
 # ---------------------------------------------------------------- comandos, búsquedas y control del sistema
 HOME = os.path.expanduser("~")
 WEBS = {
@@ -372,10 +499,6 @@ ALIAS = {
 }
 
 
-def sin_tildes(texto):
-    return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
-
-
 def lanzar(opciones):
     """Prueba las alternativas del sistema actual. Devuelve True si alguna arrancó."""
     if SISTEMA == "Windows":
@@ -480,7 +603,6 @@ def intentar_abrir_app(u, mensaje):
     )
     if m_busqueda:
         plataforma = m_busqueda.group(1).strip()
-        # Extrae la consulta respetando mayúsculas/tildes originales
         consulta = re.sub(
             r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
             r"(?:busca|buscar|encuentra|encontrar)\s+en\s+\S+(?:\s+maps)?\s+",
@@ -773,12 +895,29 @@ def chat():
         tools=[types.Tool(google_search=types.GoogleSearch())] if BUSQUEDA_GOOGLE else None,
     )
     respuesta_app, url_abrir = intentar_abrir_app(u, texto)
+    prompt_imagen = None if (respuesta_app or archivo) else detectar_solicitud_imagen(texto)
 
     def generar():
         trozos = []
         if respuesta_app:
             trozos.append(respuesta_app)
             yield respuesta_app
+        elif prompt_imagen:
+            aviso_img = f"🎨 *Generando imagen: «{prompt_imagen}»...*\n\n"
+            trozos.append(aviso_img)
+            yield aviso_img
+            nombre_img, err_img = generar_imagen_ia(prompt_imagen)
+            if nombre_img:
+                bloque_img = (
+                    f"![{prompt_imagen}](/api/imagenes/{nombre_img})\n\n"
+                    f"[⬇️ Descargar imagen](/api/imagenes/{nombre_img}?descargar=1)"
+                )
+                trozos.append(bloque_img)
+                yield bloque_img
+            else:
+                aviso_err = f"⚠️ No se pudo generar la imagen con los modelos disponibles ({err_img})."
+                trozos.append(aviso_err)
+                yield aviso_err
         else:
             fuentes = ""
             if BUSQUEDA_WEB and texto:
@@ -821,7 +960,7 @@ def chat():
         respuesta = "".join(trozos).strip() or "(sin respuesta)"
         db.session.add(Mensaje(conversacion_id=conv_id, rol="model", contenido=respuesta))
         db.session.commit()
-        if texto and not respuesta_app:
+        if texto and not respuesta_app and not prompt_imagen:
             threading.Thread(target=extraer_recuerdos, args=(uid, texto, respuesta), daemon=True).start()
 
     resp = Response(stream_with_context(generar()), mimetype="text/plain; charset=utf-8")
