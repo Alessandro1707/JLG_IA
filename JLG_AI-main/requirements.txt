@@ -8,3 +8,4 @@ ddgs>=9.0
 python-docx
 openpyxl
 fpdf2
+pypdf>=4.0

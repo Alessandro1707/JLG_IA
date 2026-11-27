@@ -1,6 +1,8 @@
 """JLG AI — asistente completo con Gemini/DeepSeek/Grok, archivos, web, memoria y voz."""
 import base64
+import csv
 import html
+import io
 import json
 import os
 import platform
@@ -26,6 +28,11 @@ from google import genai
 from google.genai import types
 import openpyxl
 from openpyxl.styles import Font, PatternFill
+
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
 
 from database import (Conversacion, Mensaje, Recuerdo, Usuario, ahora, db,
                       importar_historial_antiguo, init_db)
@@ -54,6 +61,7 @@ MODELO_MEMORIA = os.getenv("GEMINI_MEMORY_MODEL", "gemini-3.5-flash-lite")
 MAX_HISTORIAL = 30
 MAX_RECUERDOS = 100
 MAX_ARCHIVO_MB = 15
+MAX_CHARS_ADJUNTO = 32000
 
 app = Flask(__name__)
 
@@ -312,6 +320,109 @@ def sin_tildes(texto):
     return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
 
 
+# ---------------------------------------------------------------- lectura real de archivos adjuntos
+EXTENSIONES_TEXTO = {
+    ".txt", ".md", ".markdown", ".py", ".js", ".ts", ".jsx", ".tsx",
+    ".html", ".htm", ".css", ".scss", ".json", ".sql", ".cs", ".java",
+    ".c", ".cpp", ".h", ".hpp", ".php", ".rb", ".go", ".rs", ".kt",
+    ".swift", ".xml", ".yaml", ".yml", ".toml", ".ini", ".cfg",
+    ".sh", ".bat", ".ps1", ".log", ".r",
+}
+
+
+def extraer_texto_archivo(datos, nombre, mimetype=""):
+    """Extrae texto legible de Word, Excel, PDF, CSV y archivos de código/texto.
+
+    Devuelve (texto_extraido, enviar_bytes_multimodal).
+    """
+    ext = os.path.splitext((nombre or "").lower())[1]
+    mime = (mimetype or "").lower()
+
+    if mime.startswith(("image/", "audio/", "video/")) or ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
+        return None, True
+
+    texto = ""
+    enviar_bytes = False
+
+    try:
+        if ext == ".docx" or "wordprocessingml" in mime:
+            doc = Document(io.BytesIO(datos))
+            bloques = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+            for idx_t, tabla in enumerate(doc.tables, 1):
+                filas_t = []
+                for fila in tabla.rows:
+                    celdas = [c.text.strip().replace("\n", " ") for c in fila.cells]
+                    if any(celdas):
+                        filas_t.append(" | ".join(celdas))
+                if filas_t:
+                    bloques.append(f"[Tabla {idx_t}]\n" + "\n".join(filas_t))
+            texto = "\n\n".join(bloques)
+
+        elif ext in (".xlsx", ".xlsm") or "spreadsheetml" in mime:
+            wb = openpyxl.load_workbook(io.BytesIO(datos), data_only=True, read_only=True)
+            hojas_txt = []
+            for hoja in wb.sheetnames[:10]:
+                ws = wb[hoja]
+                filas_h = []
+                for fila in ws.iter_rows(values_only=True):
+                    vals = [str(v).strip() if v is not None else "" for v in fila]
+                    if any(vals):
+                        filas_h.append(" | ".join(vals))
+                if filas_h:
+                    hojas_txt.append(f"=== Hoja: {hoja} ===\n" + "\n".join(filas_h))
+            wb.close()
+            texto = "\n\n".join(hojas_txt)
+
+        elif ext in (".csv", ".tsv") or "csv" in mime:
+            crudo = datos.decode("utf-8-sig", errors="replace")
+            delimitador = "\t" if ext == ".tsv" else ","
+            lector = csv.reader(io.StringIO(crudo), delimiter=delimitador)
+            filas = [" | ".join(c.strip() for c in f) for f in lector if any(c.strip() for c in f)]
+            texto = "\n".join(filas)
+
+        elif ext == ".pdf" or mime == "application/pdf":
+            enviar_bytes = True  # Gemini también ve gráficos/escaneos nativos
+            if PdfReader is not None:
+                reader = PdfReader(io.BytesIO(datos))
+                paginas = []
+                for i, page in enumerate(reader.pages[:60], 1):
+                    t_pag = (page.extract_text() or "").strip()
+                    if t_pag:
+                        paginas.append(f"--- Página {i} ---\n{t_pag}")
+                texto = "\n\n".join(paginas)
+
+        elif ext in EXTENSIONES_TEXTO or mime.startswith("text/") or "json" in mime or "xml" in mime:
+            try:
+                texto = datos.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                texto = datos.decode("latin-1", errors="replace")
+
+        else:
+            # Archivo desconocido: intentamos leerlo como texto si no tiene bytes nulos
+            if b"\x00" not in datos[:2048]:
+                texto = datos.decode("utf-8", errors="replace")
+            else:
+                enviar_bytes = True
+    except Exception as e:
+        texto = f"[Error al leer el archivo '{nombre}': {str(e)[:150]}]"
+
+    texto = (texto or "").strip()
+    if len(texto) > MAX_CHARS_ADJUNTO:
+        texto = texto[:MAX_CHARS_ADJUNTO] + "\n\n[... contenido truncado por longitud ...]"
+
+    if texto:
+        bloque = f"[Contenido extraído del archivo adjunto «{nombre}»:\n\n{texto}\n]"
+        return bloque, enviar_bytes
+
+    if ext == ".pdf":
+        return (
+            f"[El archivo PDF «{nombre}» no contiene texto seleccionable (parece un documento escaneado o imagen).]",
+            True,
+        )
+
+    return None, enviar_bytes
+
+
 # ---------------------------------------------------------------- #4: lector de enlaces web y recordatorios
 class _ExtractorTextoHTML(HTMLParser):
     ETIQUETAS_IGNORADAS = {"script", "style", "noscript", "svg", "head", "iframe", "nav", "footer"}
@@ -403,7 +514,6 @@ def detectar_recordatorio(texto):
     original = texto.strip()
     limpio = re.sub(r"[.!?¡¿,;]+$", "", sin_tildes(original.lower())).strip()
 
-    # Caso 1: "recuérdame en 15 minutos ...", "pon un temporizador de 30 segundos (para ...)"
     m_rel = re.match(
         r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
         r"(?:recuerdame|recordarme|avisame|avisarme|pon\s+(?:un\s+|una\s+)?(?:temporizador|alarma|recordatorio)\s+(?:de|en))\s+"
@@ -438,7 +548,6 @@ def detectar_recordatorio(texto):
         payload = {"segundos": segundos, "texto": tarea}
         return f"⏰ Listo, te recordaré **{tarea}** en **{etiq_tiempo}**.", payload
 
-    # Caso 2: "recuérdame a las 7:30 pm ...", "avísame a las 19:00 ..."
     m_hora = re.match(
         r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
         r"(?:recuerdame|recordarme|avisame|avisarme|pon\s+(?:una\s+)?alarma)\s+"
@@ -1232,7 +1341,7 @@ def stream_openai_compatible(base_url, api_key, modelo, system_prompt, contenido
         method="POST",
     )
     try:
-        with urlopen(req, timeout=35) as resp:
+        with urlopen(req, timeout=45) as resp:
             for linea_raw in resp:
                 linea = linea_raw.decode("utf-8", errors="ignore").strip()
                 if not linea.startswith("data:"):
@@ -1352,13 +1461,27 @@ def chat():
         f"{'Usuario' if m.rol == 'user' else 'Asistente'}: {m.contenido[:300]}" for m in conv.mensajes[-4:])
     partes = []
     nombre_adjunto = None
+    requiere_vision_binaria = False
+
     if archivo:
         nombre_adjunto = archivo.filename or "imagen-pegada.png"
-        partes.append(types.Part.from_bytes(data=archivo.read(), mime_type=archivo.mimetype or "image/png"))
+        mime_adjunto = archivo.mimetype or "application/octet-stream"
+        datos_adjunto = archivo.read()
+        texto_adjunto, enviar_bytes = extraer_texto_archivo(datos_adjunto, nombre_adjunto, mime_adjunto)
+
+        if enviar_bytes:
+            partes.append(types.Part.from_bytes(data=datos_adjunto, mime_type=mime_adjunto))
+            # Solo exige visión multimodal si no pudimos extraer texto (imágenes, audio o PDF escaneado)
+            if not texto_adjunto or texto_adjunto.startswith("[El archivo PDF"):
+                requiere_vision_binaria = True
+
+        if texto_adjunto:
+            partes.append(types.Part.from_text(text=texto_adjunto))
+
     if texto:
         partes.append(types.Part.from_text(text=texto))
     else:
-        partes.append(types.Part.from_text(text="Analiza el archivo adjunto."))
+        partes.append(types.Part.from_text(text=f"Analiza en detalle el archivo adjunto ({nombre_adjunto})."))
     contenidos.append(types.Content(role="user", parts=partes))
 
     db.session.add(Mensaje(conversacion=conv, rol="user", contenido=texto, adjunto=nombre_adjunto))
@@ -1445,7 +1568,7 @@ def chat():
                             text=f"[No se pudo extraer el texto de {u_link}: {err_u}. Indícalo brevemente.]"
                         ))
 
-            if BUSQUEDA_WEB and texto and not leyo_url and not urls_leer:
+            if BUSQUEDA_WEB and texto and not leyo_url and not urls_leer and not archivo:
                 consulta = decidir_busqueda(texto, contexto_previo)
                 if consulta:
                     aviso_busqueda = f"🔎 *Busqué en internet: «{consulta}»*\n\n"
@@ -1460,7 +1583,7 @@ def chat():
                             text="[La búsqueda en internet no devolvió resultados. Dilo con honestidad si no sabes el dato actual.]"))
 
             usar_gemini = True
-            if motor == "deepseek" and not archivo:
+            if motor == "deepseek" and not requiere_vision_binaria:
                 ds_key = os.getenv("DEEPSEEK_API_KEY")
                 if ds_key:
                     try:
@@ -1479,7 +1602,7 @@ def chat():
                     trozos.append(aviso_fb)
                     yield aviso_fb
 
-            elif motor == "grok" and not archivo:
+            elif motor == "grok" and not requiere_vision_binaria:
                 grok_key = os.getenv("XAI_API_KEY") or os.getenv("GROK_API_KEY")
                 if grok_key:
                     try:
