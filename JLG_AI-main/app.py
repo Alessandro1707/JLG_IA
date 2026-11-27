@@ -605,40 +605,54 @@ def generar_archivo_ia(tipo, tema, u):
 
         elif tipo == "pdf":
             pdf = FPDF()
+            pdf.set_margins(15, 15, 15)
             pdf.set_auto_page_break(auto=True, margin=15)
             pdf.add_page()
+            ancho = pdf.epw
+
+            pdf.set_x(pdf.l_margin)
             pdf.set_font("Helvetica", "B", 16)
-            pdf.multi_cell(0, 9, limpiar_latin1(titulo_doc))
+            pdf.multi_cell(ancho, 9, limpiar_latin1(titulo_doc))
+
             if data.get("subtitulo"):
+                pdf.set_x(pdf.l_margin)
                 pdf.set_font("Helvetica", "I", 11)
-                pdf.multi_cell(0, 7, limpiar_latin1(str(data["subtitulo"])))
+                pdf.multi_cell(ancho, 7, limpiar_latin1(str(data["subtitulo"])))
             pdf.ln(4)
 
             for sec in (data.get("secciones") or []):
                 if sec.get("encabezado"):
+                    pdf.set_x(pdf.l_margin)
                     pdf.set_font("Helvetica", "B", 13)
-                    pdf.multi_cell(0, 8, limpiar_latin1(str(sec["encabezado"])))
+                    pdf.multi_cell(ancho, 8, limpiar_latin1(str(sec["encabezado"])))
                     pdf.ln(1)
+
                 pdf.set_font("Helvetica", "", 11)
                 for p in (sec.get("parrafos") or []):
                     if p:
-                        pdf.multi_cell(0, 6, limpiar_latin1(str(p)))
+                        pdf.set_x(pdf.l_margin)
+                        pdf.multi_cell(ancho, 6, limpiar_latin1(str(p)))
                         pdf.ln(2)
+
                 for v in (sec.get("vinetas") or []):
                     if v:
-                        pdf.multi_cell(0, 6, limpiar_latin1(f"  - {v}"))
+                        pdf.set_x(pdf.l_margin)
+                        pdf.multi_cell(ancho, 6, limpiar_latin1(f"- {v}"))
+
                 tabla = sec.get("tabla") or []
                 if len(tabla) >= 1 and isinstance(tabla[0], list) and tabla[0]:
                     pdf.ln(2)
-                    n_cols = len(tabla[0])
-                    ancho_col = (pdf.w - 20) / max(n_cols, 1)
+                    n_cols = min(len(tabla[0]), 6)
+                    ancho_col = ancho / max(n_cols, 1)
                     for r_i, fila in enumerate(tabla):
+                        pdf.set_x(pdf.l_margin)
                         pdf.set_font("Helvetica", "B" if r_i == 0 else "", 9)
                         for c_i in range(n_cols):
                             val = str(fila[c_i]) if c_i < len(fila) and fila[c_i] is not None else ""
-                            pdf.cell(ancho_col, 7, limpiar_latin1(val)[:32], border=1)
+                            pdf.cell(ancho_col, 7, limpiar_latin1(val)[:28], border=1)
                         pdf.ln()
                 pdf.ln(3)
+
             pdf.output(ruta_final)
 
         return nombre_final, titulo_doc, None
