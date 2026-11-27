@@ -14,30 +14,49 @@
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <style>
-    .screen-badge {
+    .status-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .status-badges:empty { display: none; }
+    .screen-badge, .hf-badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       padding: 6px 10px 6px 12px;
-      margin-bottom: 8px;
       border-radius: 999px;
-      background: rgba(34, 197, 94, 0.12);
-      border: 1px solid rgba(34, 197, 94, 0.35);
-      color: #86efac;
       font-size: 0.8rem;
       font-weight: 500;
       width: fit-content;
     }
-    .screen-badge[hidden] { display: none; }
-    .screen-dot {
+    .screen-badge[hidden], .hf-badge[hidden] { display: none; }
+    .screen-badge {
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      color: #86efac;
+    }
+    .hf-badge {
+      background: rgba(139, 92, 246, 0.14);
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      color: #ddd6fe;
+    }
+    .screen-dot, .hf-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
+      animation: pulseBadge 1.5s infinite;
+    }
+    .screen-dot {
       background: #22c55e;
       box-shadow: 0 0 8px #22c55e;
-      animation: pulseScreen 1.6s infinite;
     }
-    .screen-stop {
+    .hf-dot {
+      background: #a78bfa;
+      box-shadow: 0 0 8px #a78bfa;
+    }
+    .badge-stop {
       background: rgba(255, 255, 255, 0.08);
       border: none;
       color: #e2e8f0;
@@ -46,12 +65,17 @@
       font-size: 0.74rem;
       cursor: pointer;
     }
-    .screen-stop:hover { background: rgba(239, 68, 68, 0.35); color: #fecaca; }
+    .badge-stop:hover { background: rgba(239, 68, 68, 0.35); color: #fecaca; }
     #screenBtn.active {
       color: #4ade80;
       background: rgba(34, 197, 94, 0.14);
     }
-    @keyframes pulseScreen {
+    #handsFreeBtn.active {
+      color: #c4b5fd;
+      background: rgba(139, 92, 246, 0.18);
+      box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4);
+    }
+    @keyframes pulseBadge {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.45; transform: scale(0.85); }
     }
@@ -67,6 +91,7 @@
   <symbol id="i-clip" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></symbol>
   <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 20h8M12 16v4"/></symbol>
   <symbol id="i-mic" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zM18.5 11.5a6.5 6.5 0 0 1-13 0M12 18v3"/></symbol>
+  <symbol id="i-headset" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 13v3a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H4zm16 0v3a2 2 0 0 1-2 2h-1a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3zM4 13a8 8 0 0 1 16 0"/></symbol>
   <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5M6 11l6-6 6 6"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M9 9h11v11H9zM5 15H4V4h11v1"/></symbol>
@@ -151,10 +176,17 @@
 
     <footer class="dock-wrap">
       <div class="dock" id="dock">
-        <div class="screen-badge" id="screenBadge" hidden>
-          <span class="screen-dot"></span>
-          <span>Viendo tu pantalla · se enviará con tu mensaje</span>
-          <button type="button" class="screen-stop" id="stopScreenBtn">Detener</button>
+        <div class="status-badges">
+          <div class="hf-badge" id="hfBadge" hidden>
+            <span class="hf-dot"></span>
+            <span id="hfLabel">Manos libres · habla y se enviará solo</span>
+            <button type="button" class="badge-stop" id="stopHfBtn">Salir</button>
+          </div>
+          <div class="screen-badge" id="screenBadge" hidden>
+            <span class="screen-dot"></span>
+            <span>Viendo tu pantalla · se enviará con tu mensaje</span>
+            <button type="button" class="badge-stop" id="stopScreenBtn">Detener</button>
+          </div>
         </div>
         <div class="attach-preview" id="attachPreview" hidden>
           <div class="attach-thumb" id="attachThumb"></div>
@@ -167,7 +199,8 @@
           <input type="file" id="fileInput" accept="image/*,application/pdf,text/plain,audio/*" hidden>
           <button class="icon-btn" id="attachBtn" title="Adjuntar archivo"><svg><use href="#i-clip"/></svg></button>
           <button class="icon-btn" id="screenBtn" title="Compartir pantalla con JLG AI"><svg><use href="#i-screen"/></svg></button>
-          <button class="icon-btn" id="micBtn" title="Hablar"><svg><use href="#i-mic"/></svg></button>
+          <button class="icon-btn" id="micBtn" title="Dictar por voz"><svg><use href="#i-mic"/></svg></button>
+          <button class="icon-btn" id="handsFreeBtn" title="Modo Manos Libres (conversación continua sin tocar nada)"><svg><use href="#i-headset"/></svg></button>
           <span class="rec-label" id="recLabel" hidden>Escuchando · toca para parar</span>
           <div class="spacer"></div>
           <button class="send-btn" id="sendBtn" title="Enviar" disabled><svg><use href="#i-arrow"/></svg></button>
@@ -472,15 +505,39 @@ function pintar(row, texto) {
   md.querySelectorAll('a').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
 }
 
-function leerEnVoz(texto, btn) {
-  if (speechSynthesis.speaking) { speechSynthesis.cancel(); btn.classList.remove('on'); return; }
-  const limpio = texto.replace(/```[\s\S]*?```/g, ' (bloque de código) ').replace(/[*#_`>|]/g, '');
+function leerEnVoz(texto, btn, alTerminar) {
+  if (speechSynthesis.speaking && !alTerminar) {
+    speechSynthesis.cancel();
+    btn?.classList.remove('on');
+    return;
+  }
+  speechSynthesis.cancel();
+  const limpio = (texto || '')
+    .replace(/```[\s\S]*?```/g, ' (bloque de código) ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[*#_`>|]/g, '')
+    .trim();
+
+  if (!limpio) {
+    if (alTerminar) alTerminar();
+    return;
+  }
+
   const u = new SpeechSynthesisUtterance(limpio);
+  window._utteranceActiva = u;
   u.lang = 'es-ES';
   const voz = speechSynthesis.getVoices().find(v => v.lang.startsWith('es'));
   if (voz) u.voice = voz;
-  u.onend = () => btn.classList.remove('on');
-  btn.classList.add('on');
+
+  const finalizar = () => {
+    btn?.classList.remove('on');
+    window._utteranceActiva = null;
+    if (alTerminar) alTerminar();
+  };
+  u.onend = finalizar;
+  u.onerror = finalizar;
+  btn?.classList.add('on');
   speechSynthesis.speak(u);
 }
 
@@ -509,10 +566,24 @@ function modoOcupado(on) {
   actualizarBoton();
 }
 
+function pideSalirManosLibres(texto) {
+  const t = (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return /\b(desactiva|desactivar|salir|apaga|apagar|deten|detener|termina)\s+(el\s+|de\s+)?(modo\s+)?manos\s+libres\b/.test(t)
+    || /\bdeja\s+de\s+escuchar\b/.test(t);
+}
+
 async function enviar() {
   const texto = input.value.trim();
   if (state.busy || (!texto && !state.file)) return;
-  if (reconociendo) detenerMic();
+  if (reconociendo) detenerMic(true);
+
+  if (handsFree && pideSalirManosLibres(texto)) {
+    input.value = '';
+    input.style.height = 'auto';
+    actualizarBoton();
+    desactivarManosLibres();
+    return;
+  }
 
   let file = state.file;
   let capturaUnica = false;
@@ -522,7 +593,10 @@ async function enviar() {
       file = await capturarFramePantalla();
     } else if (pideVerPantalla(texto)) {
       const ok = await iniciarPantalla();
-      if (!ok) return;
+      if (!ok) {
+        if (handsFree) setTimeout(() => { if (handsFree && !state.busy) iniciarMic(); }, 500);
+        return;
+      }
       file = await capturarFramePantalla();
       capturaUnica = true;
     }
@@ -551,6 +625,7 @@ async function enviar() {
   state.controller = new AbortController();
 
   let acumulado = '';
+  let fueAbortado = false;
   try {
     const res = await fetch('/api/chat', { method: 'POST', body: fd, signal: state.controller.signal });
     if (res.status === 401) return location.href = '/login';
@@ -584,16 +659,31 @@ async function enviar() {
       }
     }
   } catch (e) {
-    if (e.name !== 'AbortError') acumulado += `\n\n⚠️ ${e.message || 'No se pudo conectar con el servidor.'}`;
-    else acumulado += '\n\n_(respuesta detenida)_';
+    if (e.name !== 'AbortError') {
+      acumulado += `\n\n⚠️ ${e.message || 'No se pudo conectar con el servidor.'}`;
+    } else {
+      fueAbortado = true;
+      acumulado += '\n\n_(respuesta detenida)_';
+    }
   } finally {
     terminarPensar(row);
     row._texto = acumulado || '⚠️ Sin respuesta.';
     pintar(row, row._texto);
     modoOcupado(false);
     scrollAbajo();
-    input.focus();
-    setTimeout(contarMemoria, 15000); // la memoria se actualiza en segundo plano
+    setTimeout(contarMemoria, 15000);
+
+    if (handsFree && !fueAbortado) {
+      actualizarEstadoManosLibres('Respondiendo en voz alta…');
+      leerEnVoz(row._texto, row.querySelector('[data-act=speak]'), () => {
+        if (handsFree && !state.busy) {
+          actualizarEstadoManosLibres('Escuchando · habla cuando quieras');
+          iniciarMic();
+        }
+      });
+    } else {
+      input.focus();
+    }
   }
 }
 
@@ -629,20 +719,67 @@ function quitarAdjunto() {
   actualizarBoton();
 }
 
-// ---------------------------------------------------------- micrófono + onda de voz
+// ---------------------------------------------------------- micrófono + manos libres continuo
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let reconociendo = false, rec = null, mediaRec = null, base = '';
 let audioCtx = null, analizador = null, streamVoz = null, rafOnda = null;
+let handsFree = false;
+let silencioTimer = null;
+let habloAlgunaVez = false;
+let ultimoSonidoTs = 0;
 
 const wave = $('#wave');
 for (let i = 0; i < 28; i++) wave.appendChild(document.createElement('i'));
 
-$('#micBtn').onclick = () => reconociendo ? detenerMic() : iniciarMic();
+$('#micBtn').onclick = () => {
+  if (handsFree) desactivarManosLibres();
+  else reconociendo ? detenerMic() : iniciarMic();
+};
+
+$('#handsFreeBtn').onclick = () => {
+  if (handsFree) desactivarManosLibres();
+  else activarManosLibres();
+};
+$('#stopHfBtn').onclick = desactivarManosLibres;
+
+function actualizarEstadoManosLibres(texto) {
+  if (texto) $('#hfLabel').textContent = texto;
+}
+
+function activarManosLibres() {
+  handsFree = true;
+  speechSynthesis.cancel();
+  $('#handsFreeBtn').classList.add('active');
+  $('#hfBadge').hidden = false;
+  actualizarEstadoManosLibres('Escuchando · habla y se enviará solo');
+  if (!reconociendo && !state.busy) iniciarMic();
+}
+
+function desactivarManosLibres() {
+  handsFree = false;
+  clearTimeout(silencioTimer);
+  speechSynthesis.cancel();
+  $('#handsFreeBtn').classList.remove('active');
+  $('#hfBadge').hidden = true;
+  if (reconociendo) detenerMic(true);
+}
+
+function programarEnvioSilencio() {
+  clearTimeout(silencioTimer);
+  if (!handsFree) return;
+  silencioTimer = setTimeout(() => {
+    if (handsFree && !state.busy && input.value.trim().length >= 2) {
+      detenerMic(true);
+      enviar();
+    }
+  }, 1600);
+}
 
 function marcarMic(on) {
   reconociendo = on;
   $('#micBtn').classList.toggle('recording', on);
   $('#recLabel').hidden = !on;
+  $('#recLabel').textContent = handsFree ? 'Manos libres · escuchando…' : 'Escuchando · toca para parar';
   wave.hidden = !on;
   document.body.classList.toggle('listening', on);
   if (!on) pararOnda();
@@ -657,6 +794,9 @@ async function empezarOnda(stream) {
     audioCtx.createMediaStreamSource(streamVoz).connect(analizador);
     const datos = new Uint8Array(analizador.frequencyBinCount);
     const barras = [...wave.children];
+    habloAlgunaVez = false;
+    ultimoSonidoTs = Date.now();
+
     const tick = () => {
       analizador.getByteFrequencyData(datos);
       let suma = 0;
@@ -665,12 +805,26 @@ async function empezarOnda(stream) {
         suma += v;
         b.style.transform = `scaleY(${0.12 + v * 0.95})`;
       });
-      document.documentElement.style.setProperty('--lvl', (suma / barras.length).toFixed(3));
+      const lvl = suma / barras.length;
+      document.documentElement.style.setProperty('--lvl', lvl.toFixed(3));
+
+      // Detección automática de silencio para el modo grabación de respaldo
+      if (handsFree && mediaRec && mediaRec.state === 'recording') {
+        if (lvl > 0.055) {
+          habloAlgunaVez = true;
+          ultimoSonidoTs = Date.now();
+        } else if (habloAlgunaVez && Date.now() - ultimoSonidoTs > 1650) {
+          detenerMic(true);
+          return;
+        }
+      }
+
       rafOnda = requestAnimationFrame(tick);
     };
     tick();
   } catch { /* la onda es decorativa: si falla, el dictado sigue */ }
 }
+
 function pararOnda() {
   cancelAnimationFrame(rafOnda);
   if (!mediaRec || mediaRec.state === 'inactive') streamVoz?.getTracks().forEach(t => t.stop());
@@ -680,6 +834,7 @@ function pararOnda() {
 }
 
 async function iniciarMic() {
+  if (reconociendo || state.busy) return;
   if (SR) {
     rec = new SR();
     rec.lang = 'es-ES';
@@ -691,20 +846,40 @@ async function iniciarMic() {
       for (const r of e.results) (r.isFinal ? (finales += r[0].transcript) : (parcial += r[0].transcript));
       input.value = base + finales + parcial;
       input.dispatchEvent(new Event('input'));
+      if ((finales + parcial).trim()) programarEnvioSilencio();
     };
     rec.onerror = (e) => {
-      if (e.error === 'not-allowed') alert('Permite el acceso al micrófono en tu navegador (requiere HTTPS o localhost).');
-      else if (e.error === 'network') { detenerMic(); return iniciarGrabacion(); }
+      if (e.error === 'not-allowed') {
+        desactivarManosLibres();
+        alert('Permite el acceso al micrófono en tu navegador (requiere HTTPS o localhost).');
+      } else if (e.error === 'network') {
+        detenerMic(true);
+        return iniciarGrabacion();
+      }
     };
-    rec.onend = () => marcarMic(false);
-    try { rec.start(); marcarMic(true); empezarOnda(); } catch { iniciarGrabacion(); }
+    rec.onend = () => {
+      marcarMic(false);
+      clearTimeout(silencioTimer);
+      if (handsFree && !state.busy && !speechSynthesis.speaking) {
+        if (input.value.trim().length >= 2) enviar();
+        else setTimeout(() => { if (handsFree && !state.busy && !reconociendo) iniciarMic(); }, 250);
+      }
+    };
+    try {
+      rec.start();
+      marcarMic(true);
+      empezarOnda();
+    } catch {
+      iniciarGrabacion();
+    }
   } else {
     iniciarGrabacion();
   }
 }
 
-// Respaldo (Firefox y otros): grabar y transcribir con Gemini
+// Respaldo (Firefox o navegadores sin Web Speech API): grabar y transcribir con Gemini
 async function iniciarGrabacion() {
+  if (reconociendo || state.busy) return;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const trozos = [];
@@ -717,21 +892,42 @@ async function iniciarGrabacion() {
       const fd = new FormData();
       fd.append('audio', blob, 'voz.webm');
       input.placeholder = 'Transcribiendo tu voz…';
+      if (handsFree) actualizarEstadoManosLibres('Transcribiendo tu voz…');
       const r = await fetch('/api/transcribir', { method: 'POST', body: fd }).then(r => r.json()).catch(() => ({}));
       input.placeholder = 'Escribe a JLG AI…';
-      if (r.texto) { input.value = (input.value ? input.value + ' ' : '') + r.texto; input.dispatchEvent(new Event('input')); input.focus(); }
+      if (r.texto && r.texto.trim()) {
+        input.value = (input.value ? input.value + ' ' : '') + r.texto.trim();
+        input.dispatchEvent(new Event('input'));
+        if (handsFree) {
+          enviar();
+        } else {
+          input.focus();
+        }
+      } else if (handsFree && !state.busy) {
+        actualizarEstadoManosLibres('Escuchando · habla y se enviará solo');
+        iniciarMic();
+      }
     };
     mediaRec.start();
     marcarMic(true);
     empezarOnda(stream);
   } catch {
+    desactivarManosLibres();
     alert('No se pudo usar el micrófono. Revisa los permisos (requiere HTTPS o localhost).');
   }
 }
 
-function detenerMic() {
-  if (rec) { rec.stop(); rec = null; }
-  if (mediaRec && mediaRec.state !== 'inactive') mediaRec.stop();
+function detenerMic(silencioso = false) {
+  clearTimeout(silencioTimer);
+  if (rec) {
+    const r = rec;
+    rec = null;
+    if (silencioso) r.onend = null;
+    try { r.stop(); } catch {}
+  }
+  if (mediaRec && mediaRec.state !== 'inactive') {
+    try { mediaRec.stop(); } catch {}
+  }
   marcarMic(false);
 }
 
