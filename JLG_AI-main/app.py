@@ -1,4 +1,5 @@
-"""JLG AI — asistente completo con Gemini/DeepSeek/Grok, archivos, web, memoria y voz."""
+"""JLG AI — asistente completo con Gemini/DeepSeek/Grok, archivos, gráficos, web, memoria y voz."""
+import asyncio
 import base64
 import csv
 import html
@@ -20,6 +21,7 @@ from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 from docx import Document
+from docx.shared import Inches as DocxInches
 from dotenv import load_dotenv
 from flask import (Flask, Response, abort, jsonify, redirect, render_template, request,
                    send_from_directory, session, stream_with_context, url_for)
@@ -28,11 +30,31 @@ from google import genai
 from google.genai import types
 import openpyxl
 from openpyxl.styles import Font, PatternFill
+from sqlalchemy import or_
 
 try:
     from pypdf import PdfReader
 except ImportError:
     PdfReader = None
+
+try:
+    from pptx import Presentation
+    from pptx.dml.color import RGBColor
+    from pptx.util import Inches, Pt
+except ImportError:
+    Presentation = None
+
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+
+try:
+    import edge_tts
+except ImportError:
+    edge_tts = None
 
 from database import (Conversacion, Mensaje, Recuerdo, Usuario, ahora, db,
                       importar_historial_antiguo, init_db)
@@ -180,7 +202,7 @@ def descargar_archivo_generado(nombre):
     return send_from_directory(FILES_DIR, nombre, as_attachment=True)
 
 
-# ---------------------------------------------------------------- conversaciones
+# ---------------------------------------------------------------- conversaciones y búsqueda en historial
 def conversacion_del_usuario(cid):
     c = db.session.get(Conversacion, cid)
     if not c or c.usuario_id != session.get("uid"):
@@ -191,8 +213,18 @@ def conversacion_del_usuario(cid):
 @app.get("/api/conversaciones")
 @login_requerido
 def listar_conversaciones():
-    convs = (Conversacion.query.filter_by(usuario_id=session["uid"])
-             .order_by(Conversacion.actualizado.desc()).limit(200).all())
+    q = (request.args.get("q") or "").strip()
+    base = Conversacion.query.filter_by(usuario_id=session["uid"])
+    if q:
+        patron = f"%{q}%"
+        convs = (base.outerjoin(Mensaje)
+                 .filter(or_(Conversacion.titulo.ilike(patron), Mensaje.contenido.ilike(patron)))
+                 .distinct()
+                 .order_by(Conversacion.actualizado.desc())
+                 .limit(100)
+                 .all())
+    else:
+        convs = base.order_by(Conversacion.actualizado.desc()).limit(200).all()
     return jsonify([c.to_dict() for c in convs])
 
 
@@ -331,10 +363,7 @@ EXTENSIONES_TEXTO = {
 
 
 def extraer_texto_archivo(datos, nombre, mimetype=""):
-    """Extrae texto legible de Word, Excel, PDF, CSV y archivos de código/texto.
-
-    Devuelve (texto_extraido, enviar_bytes_multimodal).
-    """
+    """Extrae texto legible de Word, Excel, PDF, CSV y archivos de código/texto."""
     ext = os.path.splitext((nombre or "").lower())[1]
     mime = (mimetype or "").lower()
 
@@ -381,7 +410,7 @@ def extraer_texto_archivo(datos, nombre, mimetype=""):
             texto = "\n".join(filas)
 
         elif ext == ".pdf" or mime == "application/pdf":
-            enviar_bytes = True  # Gemini también ve gráficos/escaneos nativos
+            enviar_bytes = True
             if PdfReader is not None:
                 reader = PdfReader(io.BytesIO(datos))
                 paginas = []
@@ -398,7 +427,6 @@ def extraer_texto_archivo(datos, nombre, mimetype=""):
                 texto = datos.decode("latin-1", errors="replace")
 
         else:
-            # Archivo desconocido: intentamos leerlo como texto si no tiene bytes nulos
             if b"\x00" not in datos[:2048]:
                 texto = datos.decode("utf-8", errors="replace")
             else:
@@ -423,7 +451,50 @@ def extraer_texto_archivo(datos, nombre, mimetype=""):
     return None, enviar_bytes
 
 
-# ---------------------------------------------------------------- #4: lector de enlaces web y recordatorios
+# ---------------------------------------------------------------- #3: voz neuronal natural (Edge-TTS)
+VOCES_PERMITIDAS = {
+    "es-PE-CamilaNeural",
+    "es-PE-AlexNeural",
+    "es-MX-DaliaNeural",
+    "es-MX-JorgeNeural",
+    "es-ES-AlvaroNeural",
+    "es-ES-ElviraNeural",
+    "es-CO-SalomeNeural",
+    "es-AR-ElenaNeural",
+}
+
+
+async def _sintetizar_edge_tts(texto, voz):
+    com = edge_tts.Communicate(texto, voz)
+    buf = io.BytesIO()
+    async for chunk in com.stream():
+        if chunk["type"] == "audio":
+            buf.write(chunk["data"])
+    return buf.getvalue()
+
+
+@app.post("/api/tts")
+@login_requerido
+def texto_a_voz():
+    if edge_tts is None:
+        return jsonify({"error": "edge-tts no instalado"}), 503
+    data = request.json or {}
+    texto = (data.get("texto") or "").strip()
+    voz = (data.get("voz") or "es-PE-CamilaNeural").strip()
+    if voz not in VOCES_PERMITIDAS:
+        voz = "es-PE-CamilaNeural"
+    if not texto:
+        return jsonify({"error": "Texto vacío"}), 400
+    try:
+        audio_bytes = asyncio.run(_sintetizar_edge_tts(texto[:2600], voz))
+        if not audio_bytes:
+            return jsonify({"error": "No se generó audio"}), 500
+        return Response(audio_bytes, mimetype="audio/mpeg")
+    except Exception as e:
+        return jsonify({"error": str(e)[:150]}), 500
+
+
+# ---------------------------------------------------------------- lector de enlaces web y recordatorios
 class _ExtractorTextoHTML(HTMLParser):
     ETIQUETAS_IGNORADAS = {"script", "style", "noscript", "svg", "head", "iframe", "nav", "footer"}
 
@@ -581,7 +652,7 @@ def detectar_recordatorio(texto):
     return None, None
 
 
-# ---------------------------------------------------------------- #1: generador de Word, Excel y PDF
+# ---------------------------------------------------------------- #4: Word, Excel, PDF, PowerPoint + gráficos
 def limpiar_latin1(texto):
     """Normaliza caracteres Unicode para fuentes estándar de FPDF."""
     reemplazos = {
@@ -594,7 +665,7 @@ def limpiar_latin1(texto):
 
 
 def detectar_solicitud_archivo(texto):
-    """Detecta si el usuario pide crear un archivo Word (.docx), Excel (.xlsx) o PDF (.pdf)."""
+    """Detecta si el usuario pide crear Word (.docx), Excel (.xlsx), PDF (.pdf) o PowerPoint (.pptx)."""
     if not texto:
         return None, None
     original = texto.strip()
@@ -602,29 +673,98 @@ def detectar_solicitud_archivo(texto):
 
     m = re.match(
         r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
-        r"(?:crea|crear|creame|genera|generar|generame|haz|has|hacer|hazme|hasme|redacta|redactar|redactame|arma|armar|armame|elabora|elaborar)\s+"
-        r"(?:un\s+|una\s+|el\s+|la\s+)?"
-        r"(?:documento\s+(?:de\s+|en\s+)?|archivo\s+(?:de\s+|en\s+)?|hoja\s+de\s+calculo\s+(?:de\s+|en\s+)?|plantilla\s+(?:de\s+|en\s+)?|tabla\s+(?:de\s+|en\s+)?|informe\s+(?:de\s+|en\s+)?)?"
-        r"(word|docx|excel|xlsx|pdf)\b(?:\s+(?:de|sobre|con|para|acerca\s+de)\s+)?(.*)$",
+        r"(?:crea|crear|creame|genera|generar|generame|haz|has|hacer|hazme|hasme|redacta|redactar|redactame|arma|armar|armame|elabora|elaborar|prepara|preparar|preparame)\s+"
+        r"(?:un\s+|una\s+|unos\s+|unas\s+|el\s+|la\s+)?"
+        r"(?:documento\s+(?:de\s+|en\s+)?|archivo\s+(?:de\s+|en\s+)?|hoja\s+de\s+calculo\s+(?:de\s+|en\s+)?|plantilla\s+(?:de\s+|en\s+)?|tabla\s+(?:de\s+|en\s+)?|informe\s+(?:de\s+|en\s+)?|presentacion\s+(?:de\s+|en\s+)?|diapositivas\s+(?:de\s+|en\s+)?)?"
+        r"(word|docx|excel|xlsx|pdf|powerpoint|pptx|presentacion|diapositivas)\b(?:\s+(?:de|sobre|con|para|acerca\s+de)\s+)?(.*)$",
         limpio,
     )
     if not m:
         return None, None
 
     fmt = m.group(1)
-    tipo = "docx" if fmt in ("word", "docx") else ("xlsx" if fmt in ("excel", "xlsx") else "pdf")
+    if fmt in ("word", "docx"):
+        tipo = "docx"
+    elif fmt in ("excel", "xlsx"):
+        tipo = "xlsx"
+    elif fmt in ("powerpoint", "pptx", "presentacion", "diapositivas"):
+        tipo = "pptx"
+    else:
+        tipo = "pdf"
+
     tema = re.sub(
         r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
-        r"(?:crea|crear|créame|creame|genera|generar|genérame|generame|haz|has|hacer|hazme|hasme|redacta|redactar|redáctame|redactame|arma|armar|ármame|armame|elabora|elaborar)\s+"
-        r"(?:un\s+|una\s+|el\s+|la\s+)?"
-        r"(?:documento\s+(?:de\s+|en\s+)?|archivo\s+(?:de\s+|en\s+)?|hoja\s+de\s+cálculo\s+(?:de\s+|en\s+)?|hoja\s+de\s+calculo\s+(?:de\s+|en\s+)?|plantilla\s+(?:de\s+|en\s+)?|tabla\s+(?:de\s+|en\s+)?|informe\s+(?:de\s+|en\s+)?)?"
-        r"(?:word|docx|excel|xlsx|pdf)\b(?:\s+(?:de|sobre|con|para|acerca\s+de)\s+)?",
+        r"(?:crea|crear|créame|creame|genera|generar|genérame|generame|haz|has|hacer|hazme|hasme|redacta|redactar|redáctame|redactame|arma|armar|ármame|armame|elabora|elaborar|prepara|preparar|prepárame|preparame)\s+"
+        r"(?:un\s+|una\s+|unos\s+|unas\s+|el\s+|la\s+)?"
+        r"(?:documento\s+(?:de\s+|en\s+)?|archivo\s+(?:de\s+|en\s+)?|hoja\s+de\s+cálculo\s+(?:de\s+|en\s+)?|hoja\s+de\s+calculo\s+(?:de\s+|en\s+)?|plantilla\s+(?:de\s+|en\s+)?|tabla\s+(?:de\s+|en\s+)?|informe\s+(?:de\s+|en\s+)?|presentación\s+(?:de\s+|en\s+)?|presentacion\s+(?:de\s+|en\s+)?|diapositivas\s+(?:de\s+|en\s+)?)?"
+        r"(?:word|docx|excel|xlsx|pdf|powerpoint|pptx|presentación|presentacion|diapositivas)\b(?:\s+(?:de|sobre|con|para|acerca\s+de)\s+)?",
         "",
         original,
         flags=re.IGNORECASE,
     ).strip() or "Documento generado"
 
     return tipo, tema
+
+
+def generar_grafico_png(grafico_cfg):
+    """Genera un gráfico estadístico PNG con matplotlib a partir de datos estructurados."""
+    if plt is None or not isinstance(grafico_cfg, dict):
+        return None
+    etiquetas = grafico_cfg.get("etiquetas") or []
+    valores_raw = grafico_cfg.get("valores") or []
+    if not etiquetas or not valores_raw or len(etiquetas) != len(valores_raw):
+        return None
+
+    valores = []
+    for v in valores_raw:
+        try:
+            valores.append(float(str(v).replace(",", ".").replace("%", "").replace("$", "").strip()))
+        except ValueError:
+            return None
+
+    tipo = str(grafico_cfg.get("tipo") or "barras").lower()
+    titulo = str(grafico_cfg.get("titulo") or "Análisis estadístico")[:75]
+    etiquetas_str = [str(e)[:24] for e in etiquetas[:10]]
+    valores = valores[:10]
+
+    colores = ["#4F46E5", "#7C3AED", "#2563EB", "#0EA5E9", "#10B981", "#F59E0B", "#EC4899", "#6366F1"]
+    fig, ax = plt.subplots(figsize=(7.5, 4.1), dpi=150)
+    fig.patch.set_facecolor("#FFFFFF")
+    ax.set_facecolor("#F8FAFC")
+
+    try:
+        if "pastel" in tipo or "pie" in tipo or "torta" in tipo:
+            ax.pie(valores, labels=etiquetas_str, autopct="%1.1f%%", startangle=140,
+                   colors=colores[:len(valores)], textprops={"fontsize": 9})
+            ax.axis("equal")
+        elif "linea" in tipo or "line" in tipo:
+            ax.plot(etiquetas_str, valores, marker="o", linewidth=2.6, color="#4F46E5", markersize=7)
+            ax.fill_between(range(len(valores)), valores, color="#4F46E5", alpha=0.12)
+            ax.grid(True, linestyle="--", alpha=0.45)
+            plt.xticks(rotation=20, ha="right", fontsize=8.5)
+        else:
+            barras = ax.bar(etiquetas_str, valores, color=colores[:len(valores)], width=0.55, edgecolor="none")
+            ax.grid(axis="y", linestyle="--", alpha=0.45)
+            plt.xticks(rotation=20, ha="right", fontsize=8.5)
+            for b in barras:
+                alt = b.get_height()
+                ax.annotate(f"{alt:g}", xy=(b.get_x() + b.get_width() / 2, alt),
+                            xytext=(0, 4), textcoords="offset points", ha="center", fontsize=8, fontweight="bold")
+
+        ax.set_title(titulo, fontsize=12, fontweight="bold", color="#0F172A", pad=12)
+        if "pastel" not in tipo and "pie" not in tipo and "torta" not in tipo:
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+
+        plt.tight_layout()
+        ruta_png = os.path.join(FILES_DIR, f"chart_{secrets.token_hex(5)}.png")
+        plt.savefig(ruta_png, dpi=150)
+        return ruta_png
+    except Exception as e:
+        print(f"⚠️ Error generando gráfico: {str(e)[:120]}", flush=True)
+        return None
+    finally:
+        plt.close(fig)
 
 
 def investigar_para_documento(tema):
@@ -649,8 +789,12 @@ def investigar_para_documento(tema):
 
 
 def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
-    """Investiga y construye un archivo .docx, .xlsx o .pdf extenso y bien fundamentado."""
+    """Investiga y construye .docx, .xlsx, .pdf o .pptx con datos reales y gráficos estadísticos."""
+    graficos_temp = []
     try:
+        if tipo == "pptx" and Presentation is None:
+            return None, None, "Falta instalar python-pptx en el entorno."
+
         if not info_web and fuentes is None and BUSQUEDA_WEB:
             info_web, fuentes = investigar_para_documento(tema)
         fuentes = fuentes or []
@@ -670,6 +814,21 @@ def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
                 '"hojas": [{"nombre": "Hoja 1", "columnas": ["Col1", "Col2"], '
                 '"filas": [["Dato", 100], ["Total", "=SUM(B2:B2)"]]}]}'
             )
+        elif tipo == "pptx":
+            prompt = (
+                f"Diseña una presentación ejecutiva en PowerPoint completa y bien estructurada en español sobre: {tema}.{bloque_web}\n"
+                "REGLAS:\n"
+                "- Crea entre 6 y 9 diapositivas con progresión lógica (Introducción/Contexto, Desarrollo temático, Datos/Comparativa, Casos o Impacto, Conclusiones).\n"
+                "- En cada diapositiva incluye 4 a 5 viñetas claras, concretas y sustanciosas (máximo 18 palabras por viñeta).\n"
+                "- Incluye al menos 2 diapositivas con un campo 'grafico' (valores numéricos reales) y al menos 1 diapositiva con 'tabla'.\n"
+                'Responde SOLO JSON válido con este formato:\n'
+                '{"nombre_archivo": "nombre_sin_espacios", "titulo": "Título de portada", '
+                '"subtitulo": "Subtítulo breve de portada", '
+                '"diapositivas": [{"titulo": "Título de diapositiva", "vinetas": ["Punto clave 1", "Punto clave 2"], '
+                '"tabla": [["Col 1", "Col 2"], ["Dato 1", "Valor 1"]], '
+                '"grafico": {"tipo": "barras", "titulo": "Título gráfico", "etiquetas": ["A", "B", "C"], "valores": [45, 70, 30]}, '
+                '"notas": "Notas del expositor"}]}'
+            )
         else:
             prompt = (
                 f"Redacta un informe de investigación exhaustivo, profundo y riguroso en español sobre: {tema}.{bloque_web}\n"
@@ -678,12 +837,13 @@ def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
                 "- Desarrolla entre 5 y 7 secciones bien estructuradas (por ejemplo: Resumen Ejecutivo, Contexto y Antecedentes, "
                 "Análisis Técnico/Temático Detallado, Datos y Comparativa, Retos e Impacto, y Conclusiones y Recomendaciones).\n"
                 "- En cada sección escribe entre 3 y 4 párrafos largos, informativos y bien argumentados (mínimo 4-5 líneas por párrafo).\n"
-                "- Incluye viñetas con hallazgos clave y al menos 2 tablas comparativas o cuantitativas distribuidas en el documento.\n"
+                "- Incluye viñetas con hallazgos clave, al menos 2 tablas comparativas y al menos 2 gráficos estadísticos ('grafico' con etiquetas y valores numéricos reales).\n"
                 'Responde SOLO JSON válido con este formato:\n'
                 '{"nombre_archivo": "nombre_sin_espacios", "titulo": "Título principal", '
                 '"subtitulo": "Subtítulo descriptivo", '
                 '"secciones": [{"encabezado": "1. Sección", "parrafos": ["Párrafo extenso 1...", "Párrafo extenso 2..."], '
-                '"vinetas": ["Hallazgo 1"], "tabla": [["Col 1", "Col 2"], ["Fila 1", "Valor 1"]]}]}'
+                '"vinetas": ["Hallazgo 1"], "tabla": [["Col 1", "Col 2"], ["Fila 1", "Valor 1"]], '
+                '"grafico": {"tipo": "barras", "titulo": "Título gráfico", "etiquetas": ["Item 1", "Item 2"], "valores": [65, 85]}}]}'
             )
 
         r = generar_simple(
@@ -696,7 +856,7 @@ def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
             primero=MODELO_PRO,
         )
         data = json.loads(r.text or "{}")
-        base_slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", sin_tildes(data.get("nombre_archivo") or "investigacion")).strip("_")[:45] or "investigacion"
+        base_slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", sin_tildes(data.get("nombre_archivo") or "documento")).strip("_")[:45] or "documento"
         nombre_final = f"{base_slug}_{secrets.token_hex(3)}.{tipo}"
         ruta_final = os.path.join(FILES_DIR, nombre_final)
         titulo_doc = data.get("titulo") or tema[:80]
@@ -731,6 +891,128 @@ def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
                     ws.column_dimensions[col[0].column_letter].width = min(max(max_len + 4, 12), 50)
             wb.save(ruta_final)
 
+        elif tipo == "pptx":
+            prs = Presentation()
+            prs.slide_width = Inches(13.333)
+            prs.slide_height = Inches(7.5)
+            blank_layout = prs.slide_layouts[6]
+
+            # Diapositiva 1: Portada ejecutiva oscura
+            s_cover = prs.slides.add_slide(blank_layout)
+            bg = s_cover.background
+            bg.fill.solid()
+            bg.fill.fore_color.rgb = RGBColor(15, 23, 42)
+
+            franja = s_cover.shapes.add_shape(1, Inches(0), Inches(0), Inches(0.32), Inches(7.5))
+            franja.fill.solid()
+            franja.fill.fore_color.rgb = RGBColor(99, 102, 241)
+            franja.line.fill.background()
+
+            tb = s_cover.shapes.add_textbox(Inches(1.1), Inches(2.2), Inches(11.2), Inches(3.2))
+            tf = tb.text_frame
+            tf.word_wrap = True
+            p_t = tf.paragraphs[0]
+            p_t.text = str(titulo_doc)
+            p_t.font.size = Pt(38)
+            p_t.font.bold = True
+            p_t.font.color.rgb = RGBColor(248, 250, 252)
+
+            if data.get("subtitulo"):
+                p_sub = tf.add_paragraph()
+                p_sub.text = str(data["subtitulo"])
+                p_sub.font.size = Pt(19)
+                p_sub.font.color.rgb = RGBColor(165, 180, 252)
+                p_sub.space_before = Pt(16)
+
+            p_pie = tf.add_paragraph()
+            p_pie.text = f"Generado por JLG AI · {ahora().strftime('%Y-%m-%d')}"
+            p_pie.font.size = Pt(13)
+            p_pie.font.color.rgb = RGBColor(148, 163, 184)
+            p_pie.space_before = Pt(28)
+
+            # Diapositivas de contenido
+            for sl in (data.get("diapositivas") or [])[:12]:
+                slide = prs.slides.add_slide(blank_layout)
+                s_bg = slide.background
+                s_bg.fill.solid()
+                s_bg.fill.fore_color.rgb = RGBColor(248, 250, 252)
+
+                top_bar = slide.shapes.add_shape(1, Inches(0), Inches(0), Inches(13.333), Inches(0.14))
+                top_bar.fill.solid()
+                top_bar.fill.fore_color.rgb = RGBColor(79, 70, 229)
+                top_bar.line.fill.background()
+
+                t_box = slide.shapes.add_textbox(Inches(0.75), Inches(0.42), Inches(11.8), Inches(0.85))
+                t_tf = t_box.text_frame
+                t_tf.word_wrap = True
+                p_h = t_tf.paragraphs[0]
+                p_h.text = str(sl.get("titulo") or "")
+                p_h.font.size = Pt(26)
+                p_h.font.bold = True
+                p_h.font.color.rgb = RGBColor(15, 23, 42)
+
+                ruta_chart = generar_grafico_png(sl.get("grafico"))
+                if ruta_chart:
+                    graficos_temp.append(ruta_chart)
+
+                tabla = sl.get("tabla") or []
+                tiene_tabla = len(tabla) >= 2 and isinstance(tabla[0], list) and len(tabla[0]) >= 2
+                tiene_visual = bool(ruta_chart or tiene_tabla)
+
+                # Columna izquierda de viñetas
+                ancho_vinetas = Inches(5.7) if tiene_visual else Inches(11.8)
+                v_box = slide.shapes.add_textbox(Inches(0.75), Inches(1.45), ancho_vinetas, Inches(5.4))
+                v_tf = v_box.text_frame
+                v_tf.word_wrap = True
+                vinetas = [str(v) for v in (sl.get("vinetas") or []) if v]
+                for idx_v, v in enumerate(vinetas[:6]):
+                    p = v_tf.paragraphs[0] if idx_v == 0 else v_tf.add_paragraph()
+                    p.text = f"•  {v}"
+                    p.font.size = Pt(16 if tiene_visual else 18)
+                    p.font.color.rgb = RGBColor(30, 41, 59)
+                    p.space_after = Pt(14)
+
+                # Columna derecha: gráfico o tabla
+                if ruta_chart:
+                    slide.shapes.add_picture(ruta_chart, Inches(6.75), Inches(1.55), width=Inches(5.85))
+                elif tiene_tabla:
+                    filas_n = min(len(tabla), 7)
+                    cols_n = min(len(tabla[0]), 5)
+                    t_shape = slide.shapes.add_table(filas_n, cols_n, Inches(6.75), Inches(1.6), Inches(5.85), Inches(4.5))
+                    tbl = t_shape.table
+                    for r_i in range(filas_n):
+                        for c_i in range(cols_n):
+                            cell = tbl.cell(r_i, c_i)
+                            val = str(tabla[r_i][c_i]) if c_i < len(tabla[r_i]) and tabla[r_i][c_i] is not None else ""
+                            cell.text = val[:40]
+                            for p_c in cell.text_frame.paragraphs:
+                                p_c.font.size = Pt(12)
+                                p_c.font.bold = (r_i == 0)
+
+                if sl.get("notas"):
+                    slide.notes_slide.notes_text_frame.text = str(sl["notas"])
+
+            if fuentes:
+                s_src = prs.slides.add_slide(blank_layout)
+                t_box = s_src.shapes.add_textbox(Inches(0.75), Inches(0.45), Inches(11.8), Inches(0.8))
+                p_h = t_box.text_frame.paragraphs[0]
+                p_h.text = "Fuentes consultadas"
+                p_h.font.size = Pt(24)
+                p_h.font.bold = True
+                p_h.font.color.rgb = RGBColor(15, 23, 42)
+
+                f_box = s_src.shapes.add_textbox(Inches(0.75), Inches(1.4), Inches(11.8), Inches(5.5))
+                f_tf = f_box.text_frame
+                f_tf.word_wrap = True
+                for i, f in enumerate(fuentes[:8]):
+                    p = f_tf.paragraphs[0] if i == 0 else f_tf.add_paragraph()
+                    p.text = f"{i + 1}. {f['titulo']} — {f['url']}"
+                    p.font.size = Pt(12)
+                    p.font.color.rgb = RGBColor(71, 85, 105)
+                    p.space_after = Pt(8)
+
+            prs.save(ruta_final)
+
         elif tipo == "docx":
             doc = Document()
             doc.add_heading(titulo_doc, 0)
@@ -752,6 +1034,10 @@ def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
                     for r_i, fila in enumerate(tabla):
                         for c_i in range(min(len(fila), len(tabla[0]))):
                             t.cell(r_i, c_i).text = str(fila[c_i] if fila[c_i] is not None else "")
+                ruta_chart = generar_grafico_png(sec.get("grafico"))
+                if ruta_chart:
+                    graficos_temp.append(ruta_chart)
+                    doc.add_picture(ruta_chart, width=DocxInches(5.8))
             if fuentes:
                 doc.add_heading("Fuentes consultadas", level=1)
                 for i, f in enumerate(fuentes, 1):
@@ -808,6 +1094,12 @@ def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
                             val = str(fila[c_i]) if c_i < len(fila) and fila[c_i] is not None else ""
                             pdf.cell(ancho_col, 7, limpiar_latin1(val)[:max_chars], border=1)
                         pdf.ln()
+
+                ruta_chart = generar_grafico_png(sec.get("grafico"))
+                if ruta_chart:
+                    graficos_temp.append(ruta_chart)
+                    pdf.ln(3)
+                    pdf.image(ruta_chart, x=pdf.l_margin, w=min(ancho, 165))
                 pdf.ln(3)
 
             if fuentes:
@@ -827,9 +1119,16 @@ def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
         return nombre_final, titulo_doc, None
     except Exception as e:
         return None, None, str(e)[:180]
+    finally:
+        for tmp in graficos_temp:
+            try:
+                if tmp and os.path.exists(tmp):
+                    os.remove(tmp)
+            except OSError:
+                pass
 
 
-# ---------------------------------------------------------------- #3: generador de imágenes
+# ---------------------------------------------------------------- generador de imágenes
 def detectar_solicitud_imagen(texto):
     if not texto:
         return None
@@ -929,7 +1228,6 @@ def generar_imagen_ia(prompt):
         except Exception as e:
             errores.append(f"{m}: {str(e)[:120]}")
 
-    # Respaldo gratuito sin clave si la cuota gratuita de Google bloquea Imagen
     try:
         url_fb = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1024&height=1024&nologo=true"
         req = Request(url_fb, headers={"User-Agent": "Mozilla/5.0"})
@@ -1261,7 +1559,7 @@ def intentar_abrir_app(u, mensaje):
     return None, None
 
 
-# ---------------------------------------------------------------- #2: motores IA (Gemini, DeepSeek, Grok)
+# ---------------------------------------------------------------- motores IA (Gemini, DeepSeek, Grok)
 MODELOS_RESPALDO = [m.strip() for m in os.getenv(
     "GEMINI_FALLBACK_MODELS", "gemini-3.5-flash,gemini-3.6-flash,gemini-3.1-flash-lite,gemini-3.7-flash").split(",") if m.strip()]
 
@@ -1471,7 +1769,6 @@ def chat():
 
         if enviar_bytes:
             partes.append(types.Part.from_bytes(data=datos_adjunto, mime_type=mime_adjunto))
-            # Solo exige visión multimodal si no pudimos extraer texto (imágenes, audio o PDF escaneado)
             if not texto_adjunto or texto_adjunto.startswith("[El archivo PDF"):
                 requiere_vision_binaria = True
 
@@ -1510,7 +1807,12 @@ def chat():
             trozos.append(respuesta_rec)
             yield respuesta_rec
         elif tipo_archivo:
-            nombres_fmt = {"docx": "documento Word", "xlsx": "hoja de cálculo Excel", "pdf": "documento PDF"}
+            nombres_fmt = {
+                "docx": "documento Word con gráficos",
+                "xlsx": "hoja de cálculo Excel",
+                "pdf": "informe PDF con gráficos",
+                "pptx": "presentación PowerPoint con gráficos",
+            }
             info_web, fuentes_doc = "", []
             if BUSQUEDA_WEB:
                 aviso_inv = f"🔎 *Investigando a fondo sobre «{tema_archivo}» en internet...*\n\n"
@@ -1518,7 +1820,7 @@ def chat():
                 yield aviso_inv
                 info_web, fuentes_doc = investigar_para_documento(tema_archivo)
 
-            aviso_doc = f"📄 *Redactando y generando {nombres_fmt[tipo_archivo]}...*\n\n"
+            aviso_doc = f"📊 *Diseñando y generando {nombres_fmt[tipo_archivo]}...*\n\n"
             trozos.append(aviso_doc)
             yield aviso_doc
             nombre_f, titulo_f, err_f = generar_archivo_ia(tipo_archivo, tema_archivo, u, info_web, fuentes_doc)

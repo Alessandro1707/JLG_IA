@@ -17,7 +17,7 @@
     .top-controls {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       flex-wrap: wrap;
     }
     .top-select {
@@ -25,8 +25,8 @@
       border: 1px solid rgba(255, 255, 255, 0.12);
       color: #e2e8f0;
       border-radius: 999px;
-      padding: 5px 11px;
-      font-size: 0.78rem;
+      padding: 5px 10px;
+      font-size: 0.77rem;
       font-family: inherit;
       cursor: pointer;
       outline: none;
@@ -126,6 +126,148 @@
     .msg.model .md a[href^="/api/archivos/"]:hover {
       filter: brightness(1.18);
     }
+
+    /* Botones en barra de código */
+    .code-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .preview-code-btn {
+      background: rgba(139, 92, 246, 0.22) !important;
+      border: 1px solid rgba(139, 92, 246, 0.45) !important;
+      color: #ddd6fe !important;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 0.74rem;
+      cursor: pointer;
+    }
+    .preview-code-btn:hover { background: rgba(139, 92, 246, 0.38) !important; }
+
+    /* Comandos rápidos (/) */
+    .dock-wrap { position: relative; }
+    .slash-menu {
+      position: absolute;
+      bottom: calc(100% - 6px);
+      left: 16px;
+      right: 16px;
+      max-width: 540px;
+      margin: 0 auto;
+      background: #12121b;
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .slash-menu[hidden] { display: none; }
+    .slash-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: transparent;
+      border: none;
+      color: #e2e8f0;
+      padding: 8px 11px;
+      border-radius: 9px;
+      text-align: left;
+      font-family: inherit;
+      font-size: 0.84rem;
+      cursor: pointer;
+    }
+    .slash-item:hover, .slash-item.sel {
+      background: rgba(139, 92, 246, 0.22);
+      color: #fff;
+    }
+    .slash-item b { color: #c4b5fd; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+    .slash-item small { color: #94a3b8; font-size: 0.77rem; }
+
+    /* Vista previa en vivo (Artifacts) */
+    .artifact-panel {
+      width: 48%;
+      min-width: 360px;
+      max-width: 760px;
+      background: #0d0d14;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      z-index: 35;
+    }
+    .artifact-panel[hidden] { display: none; }
+    .artifact-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .artifact-title {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .artifact-tools {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .art-btn {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+      border-radius: 8px;
+      padding: 4px 9px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .art-btn:hover, .art-btn.active {
+      background: rgba(139, 92, 246, 0.25);
+      border-color: rgba(139, 92, 246, 0.5);
+      color: #fff;
+    }
+    .artifact-stage {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      background: #181822;
+      padding: 0;
+      overflow: auto;
+    }
+    .artifact-stage iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ffffff;
+      transition: width 0.2s ease;
+    }
+    .artifact-stage.mobile { padding: 14px; }
+    .artifact-stage.mobile iframe {
+      width: 390px;
+      max-width: 100%;
+      border-radius: 18px;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
+    }
+    @media (max-width: 960px) {
+      .artifact-panel {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        z-index: 60;
+      }
+    }
+
     @keyframes pulseBadge {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.45; transform: scale(0.85); }
@@ -153,9 +295,7 @@
   <symbol id="i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M6 3h8l4 4v14H6zM14 3v4h4"/></symbol>
   <symbol id="i-bulb" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></symbol>
-  <symbol id="i-cap" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="m2 9 10-5 10 5-10 5zM6 11v5c3 2.5 9 2.5 12 0v-5"/></symbol>
   <symbol id="i-cal" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></symbol>
-  <symbol id="i-rocket" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M14 4c3-1 5-1 6 0 1 1 1 3 0 6l-6 6-6-6zM8 10l-4 1 3 3M14 16l-1 4-3-3M15.5 8.5h.01"/></symbol>
 </svg>
 
 <div class="bg-grid"></div>
@@ -175,7 +315,7 @@
 
     <label class="search">
       <svg><use href="#i-search"/></svg>
-      <input id="searchConv" placeholder="Buscar chats" autocomplete="off">
+      <input id="searchConv" placeholder="Buscar en chats y mensajes" autocomplete="off">
     </label>
 
     <nav class="conv-list" id="convList"></nav>
@@ -209,6 +349,13 @@
           <option value="codigo">Código Pro</option>
           <option value="creativo">Creativo</option>
         </select>
+        <select class="top-select" id="vozSelect" title="Voz neuronal para respuestas habladas">
+          <option value="es-PE-CamilaNeural">Voz: Camila (PE)</option>
+          <option value="es-MX-DaliaNeural">Voz: Dalia (MX)</option>
+          <option value="es-ES-AlvaroNeural">Voz: Álvaro (ES)</option>
+          <option value="es-PE-AlexNeural">Voz: Alex (PE)</option>
+          <option value="browser">Voz: Navegador</option>
+        </select>
         <div class="mode" id="mode" title="Rápido: responde en 1-2 s · Avanzado: más profundo, puede tardar">
           <button data-m="rapido">Rápido</button><button data-m="avanzado">Avanzado</button><span class="mode-pill"></span>
         </div>
@@ -219,12 +366,12 @@
       <div class="welcome" id="welcome">
         <div class="orb orb-xl" id="heroOrb"></div>
         <h1><span id="saludo">Hola</span>, <span class="accent">{{ usuario.nombre.split(' ')[0]|capitalize }}</span></h1>
-        <p class="welcome-sub">Pregúntame, crea archivos Word/Excel/PDF, genera imágenes o enséñame tu pantalla.</p>
+        <p class="welcome-sub">Crea presentaciones PowerPoint, informes con gráficos, páginas web en vivo o conversa por voz.</p>
         <div class="cards">
-          <button class="card" data-q="Crea un Excel con un presupuesto mensual personal y fórmulas">
-            <span class="card-ic"><svg><use href="#i-file"/></svg></span><b>Crear Word / Excel / PDF</b><small>Documentos y hojas reales descargables</small></button>
-          <button class="card" data-q="Genera una imagen de un estadio de fútbol futurista de noche">
-            <span class="card-ic"><svg><use href="#i-bulb"/></svg></span><b>Crear una imagen</b><small>Ilustraciones, logos y arte con IA</small></button>
+          <button class="card" data-q="Crea una presentación PowerPoint con gráficos sobre el impacto de la inteligencia artificial en 2026">
+            <span class="card-ic"><svg><use href="#i-file"/></svg></span><b>PowerPoint / Word / PDF</b><small>Documentos y diapositivas con gráficos reales</small></button>
+          <button class="card" data-q="Crea una página web moderna y responsiva en un solo archivo HTML de una calculadora científica con modo oscuro">
+            <span class="card-ic"><svg><use href="#i-bulb"/></svg></span><b>App Web con vista previa</b><small>Genera y prueba código HTML/JS en vivo</small></button>
           <button class="card" data-q="Mira mi pantalla y dime qué ves">
             <span class="card-ic"><svg><use href="#i-screen"/></svg></span><b>Mirar mi pantalla</b><small>Analiza lo que tienes abierto ahora</small></button>
           <button class="card" data-q="Recuérdame en 15 minutos revisar mis pendientes">
@@ -235,6 +382,7 @@
     </section>
 
     <footer class="dock-wrap">
+      <div class="slash-menu" id="slashMenu" hidden></div>
       <div class="dock" id="dock">
         <div class="status-badges" id="statusBadges">
           <div class="hf-badge" id="hfBadge" hidden>
@@ -255,7 +403,7 @@
           <button class="icon-btn tiny" id="removeAttach" title="Quitar"><svg><use href="#i-close"/></svg></button>
         </div>
         <div class="wave" id="wave" hidden></div>
-        <textarea id="input" rows="1" placeholder="Escribe a JLG AI…"></textarea>
+        <textarea id="input" rows="1" placeholder="Escribe a JLG AI o usa / para comandos rápidos…"></textarea>
         <div class="dock-row">
           <input type="file" id="fileInput" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.tsv,.txt,.md,.py,.js,.ts,.html,.css,.json,.sql,.cs,.java,.xml,.yaml,.yml,text/*,audio/*" hidden>
           <button class="icon-btn" id="attachBtn" title="Adjuntar imagen, Word, Excel, PDF o código"><svg><use href="#i-clip"/></svg></button>
@@ -267,9 +415,25 @@
           <button class="send-btn" id="sendBtn" title="Enviar" disabled><svg><use href="#i-arrow"/></svg></button>
         </div>
       </div>
-      <p class="hint"><kbd>Enter</kbd> enviar · <kbd>Shift</kbd>+<kbd>Enter</kbd> nueva línea · JLG AI puede equivocarse</p>
+      <p class="hint"><kbd>/</kbd> comandos · <kbd>Enter</kbd> enviar · <kbd>Shift</kbd>+<kbd>Enter</kbd> nueva línea · JLG AI puede equivocarse</p>
     </footer>
   </main>
+
+  <!-- ============ Panel de vista previa en vivo (Artifacts) ============ -->
+  <aside class="artifact-panel" id="artifactPanel" hidden>
+    <div class="artifact-head">
+      <div class="artifact-title"><span class="orb orb-xs"></span><span>Vista previa en vivo</span></div>
+      <div class="artifact-tools">
+        <button type="button" class="art-btn active" id="artDesktopBtn">Escritorio</button>
+        <button type="button" class="art-btn" id="artMobileBtn">Móvil</button>
+        <button type="button" class="art-btn" id="artNewTabBtn">Abrir ↗</button>
+        <button type="button" class="icon-btn tiny" id="closeArtifactBtn" title="Cerrar"><svg><use href="#i-close"/></svg></button>
+      </div>
+    </div>
+    <div class="artifact-stage" id="artifactStage">
+      <iframe id="artifactFrame" sandbox="allow-scripts allow-modals allow-forms"></iframe>
+    </div>
+  </aside>
 </div>
 
 <!-- ============ Modal de memoria ============ -->
@@ -289,7 +453,7 @@
 
 <script>
 const $ = (s) => document.querySelector(s);
-const state = { convId: null, file: null, controller: null, busy: false, convs: [] };
+const state = { convId: null, file: null, controller: null, busy: false, convs: [], ultimoCodigoPreview: '' };
 const esMac = /Mac|iPhone|iPad/.test(navigator.platform);
 $('#kbdNew').textContent = esMac ? '⌘K' : 'Ctrl K';
 
@@ -385,7 +549,7 @@ window.cancelarRecordatorio = (id) => {
 };
 setInterval(pintarRecordatorios, 1000);
 
-// ---------------------------------------------------------- barra lateral
+// ---------------------------------------------------------- barra lateral y búsqueda en mensajes
 function grupoFecha(iso) {
   const d = new Date(iso), hoy = new Date();
   const dias = Math.floor((new Date(hoy.toDateString()) - new Date(d.toDateString())) / 864e5);
@@ -396,19 +560,20 @@ function grupoFecha(iso) {
   return 'Antes';
 }
 
-async function cargarConversaciones() {
-  state.convs = await api('/api/conversaciones') || [];
-  pintarLista();
+async function cargarConversaciones(query = '') {
+  const url = query ? `/api/conversaciones?q=${encodeURIComponent(query)}` : '/api/conversaciones';
+  state.convs = await api(url) || [];
+  pintarLista(query);
 }
 
-function pintarLista() {
-  const filtro = $('#searchConv').value.trim().toLowerCase();
+function pintarLista(filtro = '') {
   const list = $('#convList');
   list.innerHTML = '';
   let grupoActual = null;
-  const convs = state.convs.filter(c => !filtro || c.titulo.toLowerCase().includes(filtro));
-  if (!convs.length) list.innerHTML = `<p class="empty-list">${filtro ? 'Sin resultados' : 'Aún no tienes chats'}</p>`;
-  convs.forEach(c => {
+  if (!state.convs.length) {
+    list.innerHTML = `<p class="empty-list">${filtro ? 'Sin coincidencias en tus chats' : 'Aún no tienes chats'}</p>`;
+  }
+  state.convs.forEach(c => {
     const g = grupoFecha(c.actualizado);
     if (g !== grupoActual) {
       grupoActual = g;
@@ -426,11 +591,14 @@ function pintarLista() {
         if (!confirm('¿Eliminar este chat?')) return;
         await api(`/api/conversaciones/${c.id}`, { method: 'DELETE' });
         if (state.convId === c.id) nuevaConversacion();
-        return cargarConversaciones();
+        return cargarConversaciones($('#searchConv').value.trim());
       }
       if (act === 'ren') {
         const t = prompt('Nuevo nombre', c.titulo);
-        if (t) { await api(`/api/conversaciones/${c.id}`, { method: 'PATCH', body: JSON.stringify({ titulo: t }) }); cargarConversaciones(); }
+        if (t) {
+          await api(`/api/conversaciones/${c.id}`, { method: 'PATCH', body: JSON.stringify({ titulo: t }) });
+          cargarConversaciones($('#searchConv').value.trim());
+        }
         return;
       }
       abrirConversacion(c.id);
@@ -438,7 +606,13 @@ function pintarLista() {
     list.appendChild(item);
   });
 }
-$('#searchConv').addEventListener('input', pintarLista);
+
+let searchTimer = null;
+$('#searchConv').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const q = $('#searchConv').value.trim();
+  searchTimer = setTimeout(() => cargarConversaciones(q), 260);
+});
 
 async function abrirConversacion(id) {
   if (state.busy) return;
@@ -449,7 +623,7 @@ async function abrirConversacion(id) {
   $('#welcome').hidden = true;
   data.mensajes.forEach(m => m.rol === 'user' ? burbujaUsuario(m.contenido, m.adjunto) : burbujaModelo(m.contenido));
   cerrarSidebarMovil();
-  pintarLista();
+  pintarLista($('#searchConv').value.trim());
   scrollAbajo(true);
 }
 
@@ -459,7 +633,7 @@ function nuevaConversacion() {
   $('#topTitle').textContent = 'Nuevo chat';
   $('#messages').innerHTML = '';
   $('#welcome').hidden = false;
-  pintarLista();
+  pintarLista($('#searchConv').value.trim());
   cerrarSidebarMovil();
   input.focus();
 }
@@ -475,6 +649,33 @@ function cerrarSidebarMovil() { $('#app').classList.remove('mobile-open'); }
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); nuevaConversacion(); }
 });
+
+// ---------------------------------------------------------- vista previa en vivo (Artifacts)
+function abrirVistaPrevia(codigo) {
+  state.ultimoCodigoPreview = codigo;
+  $('#artifactFrame').srcdoc = codigo;
+  $('#artifactPanel').hidden = false;
+}
+
+$('#closeArtifactBtn').onclick = () => {
+  $('#artifactPanel').hidden = true;
+  $('#artifactFrame').srcdoc = '';
+};
+$('#artDesktopBtn').onclick = () => {
+  $('#artifactStage').classList.remove('mobile');
+  $('#artDesktopBtn').classList.add('active');
+  $('#artMobileBtn').classList.remove('active');
+};
+$('#artMobileBtn').onclick = () => {
+  $('#artifactStage').classList.add('mobile');
+  $('#artMobileBtn').classList.add('active');
+  $('#artDesktopBtn').classList.remove('active');
+};
+$('#artNewTabBtn').onclick = () => {
+  if (!state.ultimoCodigoPreview) return;
+  const blob = new Blob([state.ultimoCodigoPreview], { type: 'text/html;charset=utf-8' });
+  window.open(URL.createObjectURL(blob), '_blank', 'noopener');
+};
 
 // ---------------------------------------------------------- visión de pantalla
 let screenStream = null;
@@ -606,14 +807,25 @@ function pintar(row, texto) {
   md.querySelectorAll('pre code').forEach(b => {
     try { window.hljs && hljs.highlightElement(b); } catch {}
     const pre = b.parentElement;
+    const rawCode = b.innerText;
     const lang = (b.className.match(/language-(\w+)/) || [])[1] || 'código';
+    const esPreviewable = ['html', 'htm', 'svg'].includes(lang.toLowerCase())
+      || /^\s*(<!doctype\s+html|<html|<svg)/i.test(rawCode);
+
     const bar = document.createElement('div');
     bar.className = 'code-bar';
-    bar.innerHTML = `<span>${lang}</span><button>Copiar</button>`;
-    bar.querySelector('button').onclick = (ev) => {
-      navigator.clipboard.writeText(b.innerText);
-      ev.target.textContent = 'Copiado ✓'; setTimeout(() => ev.target.textContent = 'Copiar', 1500);
+    bar.innerHTML = `<span>${lang}</span><div class="code-actions">`
+      + (esPreviewable ? '<button type="button" class="preview-code-btn">▶ Vista previa</button>' : '')
+      + '<button type="button" class="copy-code-btn">Copiar</button></div>';
+
+    bar.querySelector('.copy-code-btn').onclick = (ev) => {
+      navigator.clipboard.writeText(rawCode);
+      ev.target.textContent = 'Copiado ✓';
+      setTimeout(() => ev.target.textContent = 'Copiar', 1500);
     };
+    if (esPreviewable) {
+      bar.querySelector('.preview-code-btn').onclick = () => abrirVistaPrevia(rawCode);
+    }
     pre.prepend(bar);
   });
   md.querySelectorAll('a').forEach(a => {
@@ -627,19 +839,34 @@ function pintar(row, texto) {
   });
 }
 
-function leerEnVoz(texto, btn, alTerminar) {
-  if (speechSynthesis.speaking && !alTerminar) {
-    speechSynthesis.cancel();
-    btn?.classList.remove('on');
-    return;
+// ---------------------------------------------------------- lectura en voz neuronal + respaldo
+let audioTTSActual = null;
+let btnTTSActual = null;
+
+function detenerVozActual() {
+  if (audioTTSActual) {
+    audioTTSActual.pause();
+    audioTTSActual.src = '';
+    audioTTSActual = null;
   }
   speechSynthesis.cancel();
+  if (btnTTSActual) {
+    btnTTSActual.classList.remove('on');
+    btnTTSActual = null;
+  }
+}
+
+async function leerEnVoz(texto, btn, alTerminar) {
+  const estabaSonando = Boolean(audioTTSActual || speechSynthesis.speaking);
+  detenerVozActual();
+  if (estabaSonando && !alTerminar) return;
+
   const limpio = (texto || '')
     .replace(/```[\s\S]*?```/g, ' (bloque de código) ')
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/https?:\/\/\S+/g, '')
-    .replace(/[*#_`>|⬇️⏰]/g, '')
+    .replace(/[*#_`>|⬇️⏰📊🔎📄🎨🌐]/g, '')
     .trim();
 
   if (!limpio) {
@@ -647,21 +874,105 @@ function leerEnVoz(texto, btn, alTerminar) {
     return;
   }
 
-  const u = new SpeechSynthesisUtterance(limpio);
-  window._utteranceActiva = u;
-  u.lang = 'es-ES';
-  const voz = speechSynthesis.getVoices().find(v => v.lang.startsWith('es'));
-  if (voz) u.voice = voz;
-
-  const finalizar = () => {
-    btn?.classList.remove('on');
-    window._utteranceActiva = null;
-    if (alTerminar) alTerminar();
-  };
-  u.onend = finalizar;
-  u.onerror = finalizar;
+  const vozElegida = $('#vozSelect')?.value || 'es-PE-CamilaNeural';
+  btnTTSActual = btn || null;
   btn?.classList.add('on');
-  speechSynthesis.speak(u);
+
+  const usarVozNavegador = () => {
+    const u = new SpeechSynthesisUtterance(limpio);
+    window._utteranceActiva = u;
+    u.lang = 'es-ES';
+    const voz = speechSynthesis.getVoices().find(v => v.lang.startsWith('es'));
+    if (voz) u.voice = voz;
+    const fin = () => {
+      btn?.classList.remove('on');
+      btnTTSActual = null;
+      window._utteranceActiva = null;
+      if (alTerminar) alTerminar();
+    };
+    u.onend = fin;
+    u.onerror = fin;
+    speechSynthesis.speak(u);
+  };
+
+  if (vozElegida === 'browser') {
+    usarVozNavegador();
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texto: limpio, voz: vozElegida }),
+    });
+    if (!res.ok) throw new Error('TTS fallback');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audioTTSActual = audio;
+    const fin = () => {
+      URL.revokeObjectURL(url);
+      if (audioTTSActual === audio) audioTTSActual = null;
+      btn?.classList.remove('on');
+      btnTTSActual = null;
+      if (alTerminar) alTerminar();
+    };
+    audio.onended = fin;
+    audio.onerror = () => { fin(); usarVozNavegador(); };
+    await audio.play();
+  } catch {
+    usarVozNavegador();
+  }
+}
+
+// ---------------------------------------------------------- comandos rápidos (/)
+const COMANDOS_SLASH = [
+  { cmd: '/presentacion', desc: 'PowerPoint con gráficos reales', texto: 'Crea una presentación PowerPoint con gráficos sobre ' },
+  { cmd: '/informe', desc: 'Informe PDF investigado con gráficos', texto: 'Crea un PDF detallado con datos y gráficos sobre ' },
+  { cmd: '/excel', desc: 'Hoja de cálculo con fórmulas', texto: 'Crea un Excel con tablas, métricas y fórmulas sobre ' },
+  { cmd: '/web', desc: 'App web HTML/JS con vista previa', texto: 'Crea una página web moderna y responsiva en un solo archivo HTML sobre ' },
+  { cmd: '/resumen', desc: 'Resumen ejecutivo estructurado', texto: 'Resume de forma clara y estructurada los puntos clave de:\n' },
+  { cmd: '/debug', desc: 'Revisar y corregir código', texto: 'Analiza este código, detecta errores y entrega la versión optimizada:\n' },
+  { cmd: '/traducir', desc: 'Traducir al español natural', texto: 'Traduce al español natural manteniendo el tono original:\n' },
+];
+
+let slashFiltrados = [];
+let slashIdx = 0;
+
+function actualizarSlashMenu() {
+  const val = input.value;
+  const menu = $('#slashMenu');
+  if (!val.startsWith('/') || /\s/.test(val)) {
+    menu.hidden = true;
+    slashFiltrados = [];
+    return;
+  }
+  const q = val.toLowerCase();
+  slashFiltrados = COMANDOS_SLASH.filter(c => c.cmd.startsWith(q));
+  if (!slashFiltrados.length) {
+    menu.hidden = true;
+    return;
+  }
+  slashIdx = Math.min(slashIdx, slashFiltrados.length - 1);
+  menu.innerHTML = slashFiltrados.map((c, i) =>
+    `<button type="button" class="slash-item${i === slashIdx ? ' sel' : ''}" data-i="${i}">`
+    + `<b>${c.cmd}</b><small>${c.desc}</small></button>`
+  ).join('');
+  menu.querySelectorAll('.slash-item').forEach(btn => {
+    btn.onclick = () => aplicarSlash(Number(btn.dataset.i));
+  });
+  menu.hidden = false;
+}
+
+function aplicarSlash(i) {
+  const item = slashFiltrados[i];
+  if (!item) return;
+  input.value = item.texto;
+  $('#slashMenu').hidden = true;
+  slashFiltrados = [];
+  input.dispatchEvent(new Event('input'));
+  input.focus();
 }
 
 // ---------------------------------------------------------- enviar
@@ -672,9 +983,17 @@ function actualizarBoton() {
 input.addEventListener('input', () => {
   input.style.height = 'auto';
   input.style.height = Math.min(input.scrollHeight, 220) + 'px';
+  actualizarSlashMenu();
   actualizarBoton();
 });
 input.addEventListener('keydown', (e) => {
+  const menuAbierto = !$('#slashMenu').hidden && slashFiltrados.length > 0;
+  if (menuAbierto) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); slashIdx = (slashIdx + 1) % slashFiltrados.length; actualizarSlashMenu(); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); slashIdx = (slashIdx - 1 + slashFiltrados.length) % slashFiltrados.length; actualizarSlashMenu(); return; }
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); aplicarSlash(slashIdx); return; }
+    if (e.key === 'Escape') { e.preventDefault(); $('#slashMenu').hidden = true; return; }
+  }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar(); }
 });
 $('#sendBtn').onclick = () => state.busy ? state.controller?.abort() : enviar();
@@ -698,6 +1017,7 @@ function pideSalirManosLibres(texto) {
 async function enviar() {
   const texto = input.value.trim();
   if (state.busy || (!texto && !state.file)) return;
+  $('#slashMenu').hidden = true;
   if (reconociendo) detenerMic(true);
 
   if (handsFree && pideSalirManosLibres(texto)) {
@@ -760,7 +1080,7 @@ async function enviar() {
     }
     const eraNueva = !state.convId;
     state.convId = Number(res.headers.get('X-Conversacion-Id'));
-    if (eraNueva) cargarConversaciones();
+    if (eraNueva) cargarConversaciones($('#searchConv').value.trim());
 
     const urlAbrir = res.headers.get('X-Abrir-Url');
     if (urlAbrir) {
@@ -878,7 +1198,7 @@ function actualizarEstadoManosLibres(texto) {
 
 function activarManosLibres() {
   handsFree = true;
-  speechSynthesis.cancel();
+  detenerVozActual();
   $('#handsFreeBtn').classList.add('active');
   $('#hfBadge').hidden = false;
   actualizarEstadoManosLibres('Escuchando · habla y se enviará solo');
@@ -888,7 +1208,7 @@ function activarManosLibres() {
 function desactivarManosLibres() {
   handsFree = false;
   clearTimeout(silencioTimer);
-  speechSynthesis.cancel();
+  detenerVozActual();
   $('#handsFreeBtn').classList.remove('active');
   $('#hfBadge').hidden = true;
   if (reconociendo) detenerMic(true);
@@ -989,7 +1309,7 @@ async function iniciarMic() {
     rec.onend = () => {
       marcarMic(false);
       clearTimeout(silencioTimer);
-      if (handsFree && !state.busy && !speechSynthesis.speaking) {
+      if (handsFree && !state.busy && !audioTTSActual && !speechSynthesis.speaking) {
         if (input.value.trim().length >= 2) enviar();
         else setTimeout(() => { if (handsFree && !state.busy && !reconociendo) iniciarMic(); }, 250);
       }
@@ -1022,7 +1342,7 @@ async function iniciarGrabacion() {
       input.placeholder = 'Transcribiendo tu voz…';
       if (handsFree) actualizarEstadoManosLibres('Transcribiendo tu voz…');
       const r = await fetch('/api/transcribir', { method: 'POST', body: fd }).then(r => r.json()).catch(() => ({}));
-      input.placeholder = 'Escribe a JLG AI…';
+      input.placeholder = 'Escribe a JLG AI o usa / para comandos rápidos…';
       if (r.texto && r.texto.trim()) {
         input.value = (input.value ? input.value + ' ' : '') + r.texto.trim();
         input.dispatchEvent(new Event('input'));
@@ -1093,7 +1413,7 @@ $('#clearMemory').onclick = async () => {
   cargarMemoria();
 };
 
-// ---------------------------------------------------------- modo, motor y personalidad
+// ---------------------------------------------------------- modo, motor, personalidad y voz
 let modo = localStorage.getItem('jlg-modo') || 'rapido';
 function ponerModo(m) {
   modo = m; localStorage.setItem('jlg-modo', m);
@@ -1105,10 +1425,13 @@ ponerModo(modo);
 
 const motorSel = $('#motorSelect');
 const personaSel = $('#personaSelect');
+const vozSel = $('#vozSelect');
 motorSel.value = localStorage.getItem('jlg-motor') || 'gemini';
 personaSel.value = localStorage.getItem('jlg-persona') || 'default';
+vozSel.value = localStorage.getItem('jlg-voz') || 'es-PE-CamilaNeural';
 motorSel.onchange = () => localStorage.setItem('jlg-motor', motorSel.value);
 personaSel.onchange = () => localStorage.setItem('jlg-persona', personaSel.value);
+vozSel.onchange = () => localStorage.setItem('jlg-voz', vozSel.value);
 
 // ---------------------------------------------------------- inicio
 cargarConversaciones();
