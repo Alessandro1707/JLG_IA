@@ -266,7 +266,7 @@ def extraer_recuerdos(uid, mensaje_usuario, respuesta):
             print(f"⚠️ No se pudo actualizar la memoria: {str(e)[:150]}", flush=True)
 
 
-# ---------------------------------------------------------------- abrir apps (PC y Web)
+# ---------------------------------------------------------------- comandos, búsquedas y control del sistema
 HOME = os.path.expanduser("~")
 WEBS = {
     "google": "https://www.google.com",
@@ -294,6 +294,17 @@ WEBS = {
     "google maps": "https://maps.google.com",
     "discord": "https://discord.com/app",
     "roblox": "https://www.roblox.com",
+}
+
+BUSQUEDAS = {
+    "youtube": "https://www.youtube.com/results?search_query={q}",
+    "google": "https://www.google.com/search?q={q}",
+    "spotify": "https://open.spotify.com/search/{q}",
+    "tiktok": "https://www.tiktok.com/search?q={q}",
+    "github": "https://github.com/search?q={q}",
+    "maps": "https://www.google.com/maps/search/{q}",
+    "google maps": "https://www.google.com/maps/search/{q}",
+    "traductor": "https://translate.google.com/?sl=auto&tl=es&text={q}",
 }
 
 PROGRAMAS = {
@@ -337,6 +348,22 @@ PROGRAMAS = {
                       "Linux": [["gnome-control-center"]]},
 }
 
+PROCESOS_CERRAR = {
+    "calculadora": {"Windows": ["CalculatorApp.exe", "calc.exe"], "Linux": ["gnome-calculator", "kcalc", "galculator"], "Darwin": ["Calculator"]},
+    "bloc de notas": {"Windows": ["notepad.exe"], "Linux": ["gnome-text-editor", "gedit", "kate", "mousepad"], "Darwin": ["TextEdit"]},
+    "paint": {"Windows": ["mspaint.exe"], "Linux": ["kolourpaint", "pinta", "gimp"], "Darwin": ["Preview"]},
+    "navegador": {"Windows": ["chrome.exe"], "Linux": ["chrome", "chromium", "firefox"], "Darwin": ["Google Chrome", "Safari"]},
+    "brave": {"Windows": ["brave.exe"], "Linux": ["brave"], "Darwin": ["Brave Browser"]},
+    "spotify": {"Windows": ["Spotify.exe"], "Linux": ["spotify"], "Darwin": ["Spotify"]},
+    "steam": {"Windows": ["steam.exe"], "Linux": ["steam"], "Darwin": ["Steam"]},
+    "roblox": {"Windows": ["RobloxPlayerBeta.exe"], "Linux": [], "Darwin": ["RobloxPlayer"]},
+    "discord": {"Windows": ["Discord.exe"], "Linux": ["Discord"], "Darwin": ["Discord"]},
+    "codigo": {"Windows": ["Code.exe"], "Linux": ["code", "codium"], "Darwin": ["Visual Studio Code"]},
+    "word": {"Windows": ["WINWORD.EXE"], "Linux": ["soffice.bin"], "Darwin": ["Microsoft Word"]},
+    "excel": {"Windows": ["EXCEL.EXE"], "Linux": ["soffice.bin"], "Darwin": ["Microsoft Excel"]},
+    "powerpoint": {"Windows": ["POWERPNT.EXE"], "Linux": ["soffice.bin"], "Darwin": ["Microsoft PowerPoint"]},
+}
+
 ALIAS = {
     "vscode": "codigo", "vs code": "codigo", "visual studio code": "codigo", "visual studio": "codigo",
     "editor de codigo": "codigo", "chrome": "navegador", "explorador de archivos": "archivos",
@@ -369,11 +396,161 @@ def lanzar(opciones):
     return False
 
 
+def cerrar_programa(objetivo_alias):
+    """Cierra un programa abierto en el equipo local."""
+    objetivos = PROCESOS_CERRAR.get(objetivo_alias, {}).get(SISTEMA, [])
+    if not objetivos:
+        return False
+    cerrado = False
+    for proc in objetivos:
+        if SISTEMA == "Windows":
+            r = subprocess.run(["taskkill", "/F", "/IM", proc], capture_output=True)
+            if r.returncode == 0:
+                cerrado = True
+        elif SISTEMA == "Darwin":
+            r = subprocess.run(["osascript", "-e", f'quit app "{proc}"'], capture_output=True)
+            if r.returncode == 0:
+                cerrado = True
+        else:
+            r = subprocess.run(["pkill", "-f", proc], capture_output=True)
+            if r.returncode == 0:
+                cerrado = True
+    return cerrado
+
+
+def ejecutar_control_multimedia(accion):
+    """Envía teclas multimedia o de volumen al sistema local."""
+    if SISTEMA == "Windows":
+        codigos = {
+            "vol_up": "175,175,175,175,175",
+            "vol_down": "174,174,174,174,174",
+            "mute": "173",
+            "play_pause": "179",
+            "next": "176",
+            "prev": "177",
+        }
+        seq = codigos.get(accion)
+        if not seq:
+            return False
+        ps = f"$ws = New-Object -ComObject WScript.Shell; foreach ($c in @({seq})) {{ $ws.SendKeys([char]$c) }}"
+        return subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True).returncode == 0
+
+    if SISTEMA == "Linux":
+        comandos = {
+            "vol_up": ["pactl", "set-sink-volume", "@DEFAULT_SINK@", "+10%"],
+            "vol_down": ["pactl", "set-sink-volume", "@DEFAULT_SINK@", "-10%"],
+            "mute": ["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"],
+            "play_pause": ["playerctl", "play-pause"],
+            "next": ["playerctl", "next"],
+            "prev": ["playerctl", "previous"],
+        }
+        cmd = comandos.get(accion)
+        if cmd and shutil.which(cmd[0]):
+            return subprocess.run(cmd, capture_output=True).returncode == 0
+        return False
+
+    if SISTEMA == "Darwin":
+        scripts = {
+            "vol_up": "set volume output volume ((output volume of (get volume settings)) + 10)",
+            "vol_down": "set volume output volume ((output volume of (get volume settings)) - 10)",
+            "mute": "set volume output muted not (output muted of (get volume settings))",
+            "play_pause": 'tell application "System Events" to key code 16',
+            "next": 'tell application "System Events" to key code 17',
+            "prev": 'tell application "System Events" to key code 18',
+        }
+        sc = scripts.get(accion)
+        if sc:
+            return subprocess.run(["osascript", "-e", sc], capture_output=True).returncode == 0
+    return False
+
+
 def intentar_abrir_app(u, mensaje):
-    """Detecta 'abre <app o web>' y devuelve (texto_respuesta, url_para_navegador)."""
+    """Detecta comandos de búsqueda, multimedia, abrir/cerrar apps y webs. Devuelve (texto, url)."""
     if not mensaje:
         return None, None
-    m_limpio = re.sub(r"[.!?¡¿,;]+$", "", sin_tildes(mensaje.lower())).strip()
+    texto_original = mensaje.strip()
+    m_limpio = re.sub(r"[.!?¡¿,;]+$", "", sin_tildes(texto_original.lower())).strip()
+
+    # 1. Búsquedas directas en plataformas ("busca en youtube ...", "pon ... en spotify", "googlea ...")
+    m_busqueda = re.match(
+        r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
+        r"(?:busca|buscar|encuentra|encontrar)\s+en\s+"
+        r"(youtube|google\s+maps|google|spotify|tiktok|github|maps|traductor)\s+(.+)$",
+        m_limpio,
+    )
+    if m_busqueda:
+        plataforma = m_busqueda.group(1).strip()
+        # Extrae la consulta respetando mayúsculas/tildes originales
+        consulta = re.sub(
+            r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
+            r"(?:busca|buscar|encuentra|encontrar)\s+en\s+\S+(?:\s+maps)?\s+",
+            "",
+            texto_original,
+            flags=re.IGNORECASE,
+        ).strip()
+        url = BUSQUEDAS[plataforma].format(q=quote(consulta))
+        return f"🔎 Buscando **{consulta}** en **{plataforma.title()}**...", url
+
+    m_pon = re.match(
+        r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?(?:pon|poner|reproduce|reproducir)\s+(.+?)\s+en\s+(youtube|spotify)$",
+        m_limpio,
+    )
+    if m_pon:
+        plataforma = m_pon.group(2).strip()
+        consulta = re.sub(
+            r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?(?:pon|poner|reproduce|reproducir)\s+",
+            "",
+            texto_original,
+            flags=re.IGNORECASE,
+        )
+        consulta = re.sub(r"\s+en\s+(?:youtube|spotify)[.!?¡¿,;]*$", "", consulta, flags=re.IGNORECASE).strip()
+        url = BUSQUEDAS[plataforma].format(q=quote(consulta))
+        return f"🎵 Buscando **{consulta}** en **{plataforma.title()}**...", url
+
+    m_googlea = re.match(r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?googlea(?:r)?\s+(.+)$", m_limpio)
+    if m_googlea:
+        consulta = re.sub(
+            r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?googlea(?:r)?\s+",
+            "",
+            texto_original,
+            flags=re.IGNORECASE,
+        ).strip()
+        url = BUSQUEDAS["google"].format(q=quote(consulta))
+        return f"🔎 Buscando **{consulta}** en **Google**...", url
+
+    # 2. Control multimedia y volumen (solo en modo local)
+    controles = [
+        (r"^(?:por favor\s+)?(?:sube|subir|aumenta|aumentar)\s+(?:el\s+)?volumen$", "vol_up", "🔊 Subiendo el volumen..."),
+        (r"^(?:por favor\s+)?(?:baja|bajar|disminuye|disminuir)\s+(?:el\s+)?volumen$", "vol_down", "🔉 Bajando el volumen..."),
+        (r"^(?:por favor\s+)?(?:silencia|silenciar|mute|mutea|quita\s+el\s+sonido|activa\s+el\s+sonido)$", "mute", "🔇 Alternando silencio del sistema..."),
+        (r"^(?:por favor\s+)?(?:pon\s+pausa|pausa|pausar|reanuda|reanudar|reproduce|play)(?:\s+la\s+musica)?$", "play_pause", "⏯️ Reproducción alternada."),
+        (r"^(?:por favor\s+)?(?:siguiente\s+cancion|siguiente\s+pista|pasa\s+de\s+cancion|cambia\s+de\s+cancion)$", "next", "⏭️ Siguiente pista."),
+        (r"^(?:por favor\s+)?(?:cancion\s+anterior|pista\s+anterior|regresa\s+la\s+cancion)$", "prev", "⏮️ Pista anterior."),
+    ]
+    for patron, accion, msg_ok in controles:
+        if re.match(patron, m_limpio):
+            if APPS_LOCALES and u.es_admin:
+                if ejecutar_control_multimedia(accion):
+                    return msg_ok, None
+                return "⚠️ No pude ejecutar ese control multimedia en este equipo.", None
+            return "⚠️ Los controles de volumen y reproducción requieren ejecutar JLG AI en tu PC con `ENABLE_LOCAL_APPS=1`.", None
+
+    # 3. Cerrar aplicaciones de escritorio ("cierra calculadora", "cierra spotify")
+    m_cerrar = re.match(
+        r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?(?:cierra|cerrar|termina|finaliza)\s+(?:la\s+|el\s+|app\s+|aplicacion\s+)*(.+)$",
+        m_limpio,
+    )
+    if m_cerrar:
+        obj = m_cerrar.group(1).strip()
+        obj_alias = ALIAS.get(obj, obj)
+        if obj_alias in PROCESOS_CERRAR:
+            if APPS_LOCALES and u.es_admin:
+                if cerrar_programa(obj_alias):
+                    return f"🛑 Cerrando **{obj_alias}**...", None
+                return f"ℹ️ **{obj_alias}** no estaba abierto en este momento.", None
+            return f"⚠️ Para cerrar **{obj_alias}**, ejecuta JLG AI en tu PC con `ENABLE_LOCAL_APPS=1`.", None
+
+    # 4. Abrir aplicaciones de escritorio y páginas web
     coincidencia = re.match(
         r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
         r"(?:abre|abrir|inicia|iniciar|lanza|lanzar|ejecuta|ejecutar)\s+"
@@ -386,7 +563,6 @@ def intentar_abrir_app(u, mensaje):
     objetivo = coincidencia.group(1).strip()
     objetivo_alias = ALIAS.get(objetivo, objetivo)
 
-    # 1. Aplicaciones de escritorio (en modo local con ENABLE_LOCAL_APPS=1)
     if objetivo_alias in PROGRAMAS:
         if APPS_LOCALES and u.es_admin:
             try:
@@ -395,7 +571,6 @@ def intentar_abrir_app(u, mensaje):
                 return f"⚠️ No encontré **{objetivo_alias}** instalado en este equipo.", None
             except Exception as e:
                 return f"⚠️ No pude abrir **{objetivo_alias}**: {e}", None
-        # Si está en la nube (Render) pero tiene versión web (ej. Spotify, WhatsApp, Discord), abre la web
         if objetivo_alias in WEBS:
             return f"🌐 Abriendo **{objetivo_alias}** en una nueva pestaña...", WEBS[objetivo_alias]
         return (
@@ -404,12 +579,10 @@ def intentar_abrir_app(u, mensaje):
             None,
         )
 
-    # 2. Páginas web conocidas (funciona en PC y en Render)
     url = WEBS.get(objetivo_alias) or WEBS.get(objetivo)
     if url:
         return f"🌐 Abriendo **{objetivo}** en una nueva pestaña...", url
 
-    # 3. Dominios directos (ej. "abre platzi.com" o "abre ucv.edu.pe")
     es_archivo = re.search(
         r"\.(?:py|js|html|css|txt|pdf|docx?|xlsx?|pptx?|png|jpe?g|gif|zip|rar|exe|bat|sh|db|json|csv|md)$",
         objetivo,
@@ -442,7 +615,6 @@ def mensaje_error(e):
     return f"Error al consultar Gemini: {s[:300]}"
 
 
-# Modelos que fallaron hace poco: se saltan un rato para no hacer esperar al usuario.
 PAUSA_MODELO_S = 180
 _modelos_caidos = {}
 
@@ -459,7 +631,7 @@ def orden_modelos(primero=None):
             todos.append(m)
     ahora_ts = time.time()
     sanos = [m for m in todos if _modelos_caidos.get(m, 0) < ahora_ts]
-    return sanos or todos  # si todos fallaron, se vuelve a intentar con todos
+    return sanos or todos
 
 
 def intentos_gemini(config, primero=None):
