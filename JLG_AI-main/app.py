@@ -2,6 +2,7 @@
 import json
 import os
 import platform
+import re
 import secrets
 import shutil
 import subprocess
@@ -9,6 +10,7 @@ import threading
 import time
 import unicodedata
 from functools import wraps
+from urllib.parse import quote, urlparse
 
 from dotenv import load_dotenv
 from flask import (Flask, Response, abort, jsonify, redirect, render_template, request,
@@ -36,6 +38,8 @@ MAX_RECUERDOS = 100
 MAX_ARCHIVO_MB = 15
 
 app = Flask(__name__)
+
+
 def clave_secreta():
     if os.getenv("SECRET_KEY"):
         return os.getenv("SECRET_KEY")
@@ -262,24 +266,50 @@ def extraer_recuerdos(uid, mensaje_usuario, respuesta):
             print(f"⚠️ No se pudo actualizar la memoria: {str(e)[:150]}", flush=True)
 
 
-# ---------------------------------------------------------------- abrir apps (solo en tu PC: Windows, Mac o Linux)
+# ---------------------------------------------------------------- abrir apps (PC y Web)
 HOME = os.path.expanduser("~")
 WEBS = {
-    "google": "https://www.google.com", "youtube": "https://www.youtube.com",
-    "instagram": "https://www.instagram.com", "gmail": "https://mail.google.com",
-    "chatgpt": "https://chatgpt.com", "tiktok": "https://www.tiktok.com",
+    "google": "https://www.google.com",
+    "youtube": "https://www.youtube.com",
+    "instagram": "https://www.instagram.com",
+    "facebook": "https://www.facebook.com",
+    "gmail": "https://mail.google.com",
+    "correo": "https://mail.google.com",
+    "drive": "https://drive.google.com",
+    "google drive": "https://drive.google.com",
+    "chatgpt": "https://chatgpt.com",
+    "gemini": "https://gemini.google.com",
+    "github": "https://github.com",
+    "tiktok": "https://www.tiktok.com",
+    "twitch": "https://www.twitch.tv",
+    "netflix": "https://www.netflix.com",
+    "spotify": "https://open.spotify.com",
+    "whatsapp": "https://web.whatsapp.com",
+    "whatsapp web": "https://web.whatsapp.com",
+    "canva": "https://www.canva.com",
+    "render": "https://dashboard.render.com",
+    "supabase": "https://supabase.com/dashboard",
+    "traductor": "https://translate.google.com",
+    "maps": "https://maps.google.com",
+    "google maps": "https://maps.google.com",
+    "discord": "https://discord.com/app",
+    "roblox": "https://www.roblox.com",
 }
-# Por cada app, varias alternativas por sistema: se usa la primera que exista.
-# Mac: ("-b", "id.del.paquete") abre por identificador, aunque la app tenga otro nombre de archivo.
+
 PROGRAMAS = {
     "calculadora": {"Windows": "calc", "Darwin": [("-b", "com.apple.calculator")],
                     "Linux": [["gnome-calculator"], ["kcalc"], ["galculator"], ["mate-calc"], ["xcalc"]]},
     "bloc de notas": {"Windows": "notepad", "Darwin": [("-b", "com.apple.TextEdit")],
                       "Linux": [["gnome-text-editor"], ["gedit"], ["kate"], ["mousepad"], ["xed"], ["pluma"]]},
+    "paint": {"Windows": "mspaint", "Darwin": [("-b", "com.apple.Preview")],
+              "Linux": [["kolourpaint"], ["pinta"], ["gimp"]]},
     "navegador": {"Windows": "start chrome",
                   "Darwin": [("-b", "com.google.Chrome"), ("-b", "com.apple.Safari")],
                   "Linux": [["google-chrome"], ["chromium"], ["chromium-browser"], ["firefox"],
                             ["xdg-open", "https://www.google.com"]]},
+    "brave": {"Windows": "start brave",
+              "Darwin": [("-b", "com.brave.Browser")],
+              "Linux": [["brave-browser"], ["brave"]]},
     "whatsapp": {"Windows": "start https://web.whatsapp.com",
                  "Darwin": [("-b", "net.whatsapp.WhatsApp"), ("url", "https://web.whatsapp.com")],
                  "Linux": [["xdg-open", "https://web.whatsapp.com"]]},
@@ -289,29 +319,34 @@ PROGRAMAS = {
               "Linux": [["steam"], ["flatpak", "run", "com.valvesoftware.Steam"]]},
     "roblox": {"Windows": "start roblox:", "Darwin": [("-b", "com.roblox.RobloxPlayer"), ("url", "https://www.roblox.com")],
                "Linux": [["xdg-open", "https://www.roblox.com"]]},
+    "discord": {"Windows": "start discord:", "Darwin": [("-b", "com.hnc.Discord")],
+                "Linux": [["discord"], ["flatpak", "run", "com.discordapp.Discord"]]},
     "codigo": {"Windows": "code", "Darwin": [("-b", "com.microsoft.VSCode")],
                "Linux": [["code"], ["codium"], ["flatpak", "run", "com.visualstudio.code"]]},
     "terminal": {"Windows": "start cmd", "Darwin": [("-b", "com.apple.Terminal")],
                  "Linux": [["x-terminal-emulator"], ["gnome-terminal"], ["konsole"], ["xfce4-terminal"], ["xterm"]]},
     "archivos": {"Windows": "explorer", "Darwin": [("path", HOME)],
                  "Linux": [["xdg-open", HOME], ["nautilus"], ["dolphin"], ["thunar"]]},
+    "word": {"Windows": "start winword", "Darwin": [("-b", "com.microsoft.Word")],
+             "Linux": [["libreoffice", "--writer"]]},
+    "excel": {"Windows": "start excel", "Darwin": [("-b", "com.microsoft.Excel")],
+              "Linux": [["libreoffice", "--calc"]]},
+    "powerpoint": {"Windows": "start powerpnt", "Darwin": [("-b", "com.microsoft.Powerpoint")],
+                   "Linux": [["libreoffice", "--impress"]]},
+    "configuracion": {"Windows": "start ms-settings:", "Darwin": [("-b", "com.apple.systempreferences")],
+                      "Linux": [["gnome-control-center"]]},
 }
-ALIAS = {"vscode": "codigo", "visual studio": "codigo", "editor de codigo": "codigo", "chrome": "navegador",
-         "explorador": "archivos", "finder": "archivos", "notas": "bloc de notas", "consola": "terminal"}
+
+ALIAS = {
+    "vscode": "codigo", "vs code": "codigo", "visual studio code": "codigo", "visual studio": "codigo",
+    "editor de codigo": "codigo", "chrome": "navegador", "explorador de archivos": "archivos",
+    "explorador": "archivos", "finder": "archivos", "bloc": "bloc de notas", "notas": "bloc de notas",
+    "notepad": "bloc de notas", "consola": "terminal", "cmd": "terminal", "ajustes": "configuracion"
+}
 
 
 def sin_tildes(texto):
     return "".join(c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn")
-
-
-def abrir_url(url):
-    if SISTEMA == "Windows":
-        os.startfile(url)
-    elif SISTEMA == "Darwin":
-        subprocess.Popen(["open", url])
-    else:
-        subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return True
 
 
 def lanzar(opciones):
@@ -323,7 +358,8 @@ def lanzar(opciones):
         if SISTEMA == "Darwin":
             tipo, valor = op
             if tipo == "url":
-                return abrir_url(valor)
+                subprocess.Popen(["open", valor])
+                return True
             cmd = ["open", valor] if tipo == "path" else ["open", "-b", valor]
             if subprocess.run(cmd, capture_output=True, timeout=15).returncode == 0:
                 return True
@@ -334,26 +370,55 @@ def lanzar(opciones):
 
 
 def intentar_abrir_app(u, mensaje):
-    if not (APPS_LOCALES and u.es_admin):
-        return None
-    m = sin_tildes(mensaje.lower())
-    if not any(p in m.split()[:3] for p in ("abre", "abrir", "inicia", "iniciar", "lanza", "lanzar", "ejecuta")):
-        return None
-    for alias, nombre in ALIAS.items():
-        m = m.replace(alias, nombre)
-    try:
-        for nombre, por_sistema in PROGRAMAS.items():
-            if nombre in m:
-                if lanzar(por_sistema[SISTEMA]):
-                    return f"🚀 Abriendo **{nombre}**..."
-                return f"⚠️ No encontré **{nombre}** instalado en este equipo."
-        for nombre, url in WEBS.items():
-            if nombre in m:
-                abrir_url(url)
-                return f"🚀 Abriendo **{nombre}**..."
-    except Exception as e:
-        return f"⚠️ No pude abrir la aplicación: {e}"
-    return None  # no es una app conocida: responde Gemini
+    """Detecta 'abre <app o web>' y devuelve (texto_respuesta, url_para_navegador)."""
+    if not mensaje:
+        return None, None
+    m_limpio = re.sub(r"[.!?¡¿,;]+$", "", sin_tildes(mensaje.lower())).strip()
+    coincidencia = re.match(
+        r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
+        r"(?:abre|abrir|inicia|iniciar|lanza|lanzar|ejecuta|ejecutar)\s+"
+        r"(?:la\s+|el\s+|las\s+|los\s+|app\s+|aplicacion\s+|pagina\s+|web\s+|sitio\s+)*(.+)$",
+        m_limpio,
+    )
+    if not coincidencia:
+        return None, None
+
+    objetivo = coincidencia.group(1).strip()
+    objetivo_alias = ALIAS.get(objetivo, objetivo)
+
+    # 1. Aplicaciones de escritorio (en modo local con ENABLE_LOCAL_APPS=1)
+    if objetivo_alias in PROGRAMAS:
+        if APPS_LOCALES and u.es_admin:
+            try:
+                if lanzar(PROGRAMAS[objetivo_alias][SISTEMA]):
+                    return f"🚀 Abriendo **{objetivo_alias}** en tu equipo...", None
+                return f"⚠️ No encontré **{objetivo_alias}** instalado en este equipo.", None
+            except Exception as e:
+                return f"⚠️ No pude abrir **{objetivo_alias}**: {e}", None
+        # Si está en la nube (Render) pero tiene versión web (ej. Spotify, WhatsApp, Discord), abre la web
+        if objetivo_alias in WEBS:
+            return f"🌐 Abriendo **{objetivo_alias}** en una nueva pestaña...", WEBS[objetivo_alias]
+        return (
+            f"⚠️ **{objetivo_alias}** es un programa de escritorio. "
+            "Para abrirlo, ejecuta JLG AI en tu PC con `ENABLE_LOCAL_APPS=1` en `.env`.",
+            None,
+        )
+
+    # 2. Páginas web conocidas (funciona en PC y en Render)
+    url = WEBS.get(objetivo_alias) or WEBS.get(objetivo)
+    if url:
+        return f"🌐 Abriendo **{objetivo}** en una nueva pestaña...", url
+
+    # 3. Dominios directos (ej. "abre platzi.com" o "abre ucv.edu.pe")
+    es_archivo = re.search(
+        r"\.(?:py|js|html|css|txt|pdf|docx?|xlsx?|pptx?|png|jpe?g|gif|zip|rar|exe|bat|sh|db|json|csv|md)$",
+        objetivo,
+    )
+    if not es_archivo and re.match(r"^(?:https?://)?[a-z0-9-]+(\.[a-z0-9-]+)+(/.*)?$", objetivo):
+        url_directa = objetivo if objetivo.startswith(("http://", "https://")) else f"https://{objetivo}"
+        return f"🌐 Abriendo **{url_directa}** en una nueva pestaña...", url_directa
+
+    return None, None
 
 
 # ---------------------------------------------------------------- chat
@@ -485,7 +550,6 @@ def texto_resultados(consulta, resultados):
 
 
 def fuentes_markdown(resultados):
-    from urllib.parse import urlparse
     enlaces = []
     for r in resultados[:5]:
         dominio = urlparse(r["url"]).netloc.replace("www.", "")
@@ -536,7 +600,7 @@ def chat():
         system_instruction=instrucciones_sistema(u),
         tools=[types.Tool(google_search=types.GoogleSearch())] if BUSQUEDA_GOOGLE else None,
     )
-    respuesta_app = intentar_abrir_app(u, texto)
+    respuesta_app, url_abrir = intentar_abrir_app(u, texto)
 
     def generar():
         trozos = []
@@ -590,6 +654,8 @@ def chat():
 
     resp = Response(stream_with_context(generar()), mimetype="text/plain; charset=utf-8")
     resp.headers["X-Conversacion-Id"] = str(conv_id)
+    if url_abrir:
+        resp.headers["X-Abrir-Url"] = quote(url_abrir, safe=":/?#[]@!$&'()*+,;=%")
     resp.headers["X-Accel-Buffering"] = "no"
     resp.headers["Cache-Control"] = "no-cache"
     return resp
