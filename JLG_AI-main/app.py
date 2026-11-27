@@ -77,7 +77,7 @@ init_db(app)
 
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY"),
-    http_options=types.HttpOptions(timeout=int(os.getenv("GEMINI_TIMEOUT_S", "25")) * 1000),
+    http_options=types.HttpOptions(timeout=int(os.getenv("GEMINI_TIMEOUT_S", "60")) * 1000),
 )
 
 
@@ -518,13 +518,44 @@ def detectar_solicitud_archivo(texto):
     return tipo, tema
 
 
-def generar_archivo_ia(tipo, tema, u):
-    """Pide estructura JSON a Gemini y construye un archivo .docx, .xlsx o .pdf real."""
+def investigar_para_documento(tema):
+    """Busca en internet desde dos ángulos para nutrir documentos con datos y cifras reales."""
+    if not BUSQUEDA_WEB:
+        return "", []
     try:
+        resultados = buscar_web(tema, maximo=7)
+        extra = buscar_web(f"{tema} datos estadisticas analisis", maximo=5)
+        vistos = {r["url"] for r in resultados}
+        for r in extra:
+            if r["url"] not in vistos:
+                vistos.add(r["url"])
+                resultados.append(r)
+        resultados = resultados[:10]
+        if not resultados:
+            return "", []
+        return texto_resultados(tema, resultados), resultados
+    except Exception as e:
+        print(f"⚠️ Error investigando para documento: {str(e)[:120]}", flush=True)
+        return "", []
+
+
+def generar_archivo_ia(tipo, tema, u, info_web="", fuentes=None):
+    """Investiga y construye un archivo .docx, .xlsx o .pdf extenso y bien fundamentado."""
+    try:
+        if not info_web and fuentes is None and BUSQUEDA_WEB:
+            info_web, fuentes = investigar_para_documento(tema)
+        fuentes = fuentes or []
+
+        bloque_web = (
+            f"\n\nINFORMACIÓN INVESTIGADA EN INTERNET (úsala como fuente principal; incluye datos, cifras, fechas, nombres y hechos reales):\n{info_web}\n"
+            if info_web else ""
+        )
+
         if tipo == "xlsx":
             prompt = (
-                f"Crea la estructura de una hoja de cálculo Excel útil y bien organizada sobre: {tema}.\n"
-                "Usa fórmulas reales de Excel en inglés (como =SUM(B2:B5), =AVERAGE(C2:C5), =B2*C2) cuando haya totales o cálculos.\n"
+                f"Crea un libro de Excel completo, analítico y detallado sobre: {tema}.{bloque_web}\n"
+                "Genera entre 2 y 4 hojas temáticas (por ejemplo: Resumen y KPIs, Datos Detallados, Comparativa/Proyección).\n"
+                "Usa fórmulas reales de Excel en inglés (como =SUM(B2:B10), =AVERAGE(C2:C10), =B2*C2) en filas de totales o métricas.\n"
                 'Responde SOLO JSON válido con este formato:\n'
                 '{"nombre_archivo": "nombre_sin_espacios", "titulo": "Título legible", '
                 '"hojas": [{"nombre": "Hoja 1", "columnas": ["Col1", "Col2"], '
@@ -532,13 +563,18 @@ def generar_archivo_ia(tipo, tema, u):
             )
         else:
             prompt = (
-                f"Redacta un documento profesional, completo y bien estructurado en español sobre: {tema}.\n"
-                "Incluye secciones claras, párrafos informativos, viñetas y una tabla si aporta valor.\n"
+                f"Redacta un informe de investigación exhaustivo, profundo y riguroso en español sobre: {tema}.{bloque_web}\n"
+                "REGLAS DE PROFUNDIDAD:\n"
+                "- NO hagas un resumen corto ni superficial.\n"
+                "- Desarrolla entre 5 y 7 secciones bien estructuradas (por ejemplo: Resumen Ejecutivo, Contexto y Antecedentes, "
+                "Análisis Técnico/Temático Detallado, Datos y Comparativa, Retos e Impacto, y Conclusiones y Recomendaciones).\n"
+                "- En cada sección escribe entre 3 y 4 párrafos largos, informativos y bien argumentados (mínimo 4-5 líneas por párrafo).\n"
+                "- Incluye viñetas con hallazgos clave y al menos 2 tablas comparativas o cuantitativas distribuidas en el documento.\n"
                 'Responde SOLO JSON válido con este formato:\n'
                 '{"nombre_archivo": "nombre_sin_espacios", "titulo": "Título principal", '
-                '"subtitulo": "Subtítulo breve", '
-                '"secciones": [{"encabezado": "1. Sección", "parrafos": ["Texto..."], '
-                '"vinetas": ["Punto 1"], "tabla": [["Col 1", "Col 2"], ["Fila 1", "Valor 1"]]}]}'
+                '"subtitulo": "Subtítulo descriptivo", '
+                '"secciones": [{"encabezado": "1. Sección", "parrafos": ["Párrafo extenso 1...", "Párrafo extenso 2..."], '
+                '"vinetas": ["Hallazgo 1"], "tabla": [["Col 1", "Col 2"], ["Fila 1", "Valor 1"]]}]}'
             )
 
         r = generar_simple(
@@ -546,12 +582,12 @@ def generar_archivo_ia(tipo, tema, u):
             types.GenerateContentConfig(
                 system_instruction=instrucciones_sistema(u),
                 response_mime_type="application/json",
-                temperature=0.3,
+                temperature=0.35,
             ),
             primero=MODELO_PRO,
         )
         data = json.loads(r.text or "{}")
-        base_slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", sin_tildes(data.get("nombre_archivo") or "documento")).strip("_")[:45] or "documento"
+        base_slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", sin_tildes(data.get("nombre_archivo") or "investigacion")).strip("_")[:45] or "investigacion"
         nombre_final = f"{base_slug}_{secrets.token_hex(3)}.{tipo}"
         ruta_final = os.path.join(FILES_DIR, nombre_final)
         titulo_doc = data.get("titulo") or tema[:80]
@@ -559,11 +595,18 @@ def generar_archivo_ia(tipo, tema, u):
         if tipo == "xlsx":
             wb = openpyxl.Workbook()
             wb.remove(wb.active)
-            hojas = data.get("hojas") or [{"nombre": "Datos", "columnas": ["Item", "Detalle"], "filas": [[tema, ""]]}]
+            hojas = list(data.get("hojas") or [{"nombre": "Datos", "columnas": ["Item", "Detalle"], "filas": [[tema, ""]]}])
+            if fuentes:
+                hojas.append({
+                    "nombre": "Fuentes",
+                    "columnas": ["N°", "Título", "Fecha", "URL"],
+                    "filas": [[i, f["titulo"], f.get("fecha", ""), f["url"]] for i, f in enumerate(fuentes, 1)],
+                })
+
             header_fill = PatternFill("solid", fgColor="4F46E5")
             header_font = Font(bold=True, color="FFFFFF")
 
-            for idx, h in enumerate(hojas[:5]):
+            for idx, h in enumerate(hojas[:6]):
                 ws = wb.create_sheet(title=(h.get("nombre") or f"Hoja {idx + 1}")[:31])
                 cols = h.get("columnas") or []
                 if cols:
@@ -576,7 +619,7 @@ def generar_archivo_ia(tipo, tema, u):
                         ws.append(fila)
                 for col in ws.columns:
                     max_len = max((len(str(c.value or "")) for c in col), default=10)
-                    ws.column_dimensions[col[0].column_letter].width = min(max(max_len + 4, 12), 45)
+                    ws.column_dimensions[col[0].column_letter].width = min(max(max_len + 4, 12), 50)
             wb.save(ruta_final)
 
         elif tipo == "docx":
@@ -600,6 +643,11 @@ def generar_archivo_ia(tipo, tema, u):
                     for r_i, fila in enumerate(tabla):
                         for c_i in range(min(len(fila), len(tabla[0]))):
                             t.cell(r_i, c_i).text = str(fila[c_i] if fila[c_i] is not None else "")
+            if fuentes:
+                doc.add_heading("Fuentes consultadas", level=1)
+                for i, f in enumerate(fuentes, 1):
+                    fecha = f" ({f['fecha']})" if f.get("fecha") else ""
+                    doc.add_paragraph(f"{i}. {f['titulo']}{fecha} — {f['url']}", style="List Bullet")
             doc.save(ruta_final)
 
         elif tipo == "pdf":
@@ -643,14 +691,27 @@ def generar_archivo_ia(tipo, tema, u):
                     pdf.ln(2)
                     n_cols = min(len(tabla[0]), 6)
                     ancho_col = ancho / max(n_cols, 1)
+                    max_chars = max(int(ancho_col / 2.1), 18)
                     for r_i, fila in enumerate(tabla):
                         pdf.set_x(pdf.l_margin)
-                        pdf.set_font("Helvetica", "B" if r_i == 0 else "", 9)
+                        pdf.set_font("Helvetica", "B" if r_i == 0 else "", 8.5)
                         for c_i in range(n_cols):
                             val = str(fila[c_i]) if c_i < len(fila) and fila[c_i] is not None else ""
-                            pdf.cell(ancho_col, 7, limpiar_latin1(val)[:28], border=1)
+                            pdf.cell(ancho_col, 7, limpiar_latin1(val)[:max_chars], border=1)
                         pdf.ln()
                 pdf.ln(3)
+
+            if fuentes:
+                pdf.set_x(pdf.l_margin)
+                pdf.set_font("Helvetica", "B", 13)
+                pdf.multi_cell(ancho, 8, "Fuentes consultadas")
+                pdf.ln(1)
+                pdf.set_font("Helvetica", "", 9.5)
+                for i, f in enumerate(fuentes, 1):
+                    fecha = f" ({f['fecha']})" if f.get("fecha") else ""
+                    pdf.set_x(pdf.l_margin)
+                    pdf.multi_cell(ancho, 5.5, limpiar_latin1(f"{i}. {f['titulo']}{fecha}: {f['url']}"))
+                    pdf.ln(1)
 
             pdf.output(ruta_final)
 
@@ -1327,10 +1388,17 @@ def chat():
             yield respuesta_rec
         elif tipo_archivo:
             nombres_fmt = {"docx": "documento Word", "xlsx": "hoja de cálculo Excel", "pdf": "documento PDF"}
-            aviso_doc = f"📄 *Generando {nombres_fmt[tipo_archivo]} sobre «{tema_archivo}»...*\n\n"
+            info_web, fuentes_doc = "", []
+            if BUSQUEDA_WEB:
+                aviso_inv = f"🔎 *Investigando a fondo sobre «{tema_archivo}» en internet...*\n\n"
+                trozos.append(aviso_inv)
+                yield aviso_inv
+                info_web, fuentes_doc = investigar_para_documento(tema_archivo)
+
+            aviso_doc = f"📄 *Redactando y generando {nombres_fmt[tipo_archivo]}...*\n\n"
             trozos.append(aviso_doc)
             yield aviso_doc
-            nombre_f, titulo_f, err_f = generar_archivo_ia(tipo_archivo, tema_archivo, u)
+            nombre_f, titulo_f, err_f = generar_archivo_ia(tipo_archivo, tema_archivo, u, info_web, fuentes_doc)
             if nombre_f:
                 bloque_doc = (
                     f"**{titulo_f}**\n\n"
