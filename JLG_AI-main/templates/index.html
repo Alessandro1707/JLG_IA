@@ -404,6 +404,13 @@ async function enviar() {
     state.convId = Number(res.headers.get('X-Conversacion-Id'));
     if (eraNueva) cargarConversaciones();
 
+    const urlAbrir = res.headers.get('X-Abrir-Url');
+    if (urlAbrir) {
+      let destino = urlAbrir;
+      try { destino = decodeURIComponent(urlAbrir); } catch {}
+      window.open(destino, '_blank', 'noopener,noreferrer');
+    }
+
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let pendiente = false;
