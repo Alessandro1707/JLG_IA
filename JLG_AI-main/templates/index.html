@@ -14,6 +14,26 @@
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <style>
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .top-select {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      cursor: pointer;
+      outline: none;
+    }
+    .top-select:hover { border-color: rgba(139, 92, 246, 0.5); }
+    .top-select option { background: #12121a; color: #f8fafc; }
+
     .status-badges {
       display: flex;
       flex-wrap: wrap;
@@ -21,7 +41,7 @@
       margin-bottom: 8px;
     }
     .status-badges:empty { display: none; }
-    .screen-badge, .hf-badge {
+    .screen-badge, .hf-badge, .rem-badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -42,20 +62,20 @@
       border: 1px solid rgba(139, 92, 246, 0.4);
       color: #ddd6fe;
     }
-    .screen-dot, .hf-dot {
+    .rem-badge {
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fde68a;
+    }
+    .screen-dot, .hf-dot, .rem-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       animation: pulseBadge 1.5s infinite;
     }
-    .screen-dot {
-      background: #22c55e;
-      box-shadow: 0 0 8px #22c55e;
-    }
-    .hf-dot {
-      background: #a78bfa;
-      box-shadow: 0 0 8px #a78bfa;
-    }
+    .screen-dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .hf-dot { background: #a78bfa; box-shadow: 0 0 8px #a78bfa; }
+    .rem-dot { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
     .badge-stop {
       background: rgba(255, 255, 255, 0.08);
       border: none;
@@ -66,10 +86,7 @@
       cursor: pointer;
     }
     .badge-stop:hover { background: rgba(239, 68, 68, 0.35); color: #fecaca; }
-    #screenBtn.active {
-      color: #4ade80;
-      background: rgba(34, 197, 94, 0.14);
-    }
+    #screenBtn.active { color: #4ade80; background: rgba(34, 197, 94, 0.14); }
     #handsFreeBtn.active {
       color: #c4b5fd;
       background: rgba(139, 92, 246, 0.18);
@@ -84,22 +101,30 @@
       margin: 8px 0 10px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
     }
-    .msg.model .md a[href^="/api/imagenes/"] {
+    .msg.model .md a[href^="/api/imagenes/"],
+    .msg.model .md a[href^="/api/archivos/"] {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: 999px;
+      gap: 7px;
+      padding: 8px 15px;
+      border-radius: 12px;
       background: rgba(139, 92, 246, 0.18);
       border: 1px solid rgba(139, 92, 246, 0.42);
       color: #ddd6fe;
       text-decoration: none;
-      font-size: 0.84rem;
+      font-size: 0.85rem;
       font-weight: 500;
+      margin-top: 4px;
       transition: background 0.18s ease;
     }
-    .msg.model .md a[href^="/api/imagenes/"]:hover {
-      background: rgba(139, 92, 246, 0.32);
+    .msg.model .md a[href^="/api/archivos/"] {
+      background: rgba(59, 130, 246, 0.16);
+      border-color: rgba(59, 130, 246, 0.42);
+      color: #bfdbfe;
+    }
+    .msg.model .md a[href^="/api/imagenes/"]:hover,
+    .msg.model .md a[href^="/api/archivos/"]:hover {
+      filter: brightness(1.18);
     }
     @keyframes pulseBadge {
       0%, 100% { opacity: 1; transform: scale(1); }
@@ -171,8 +196,22 @@
     <header class="topbar">
       <button class="icon-btn" id="openSidebar" title="Mostrar panel"><svg><use href="#i-panel"/></svg></button>
       <div class="topbar-title" id="topTitle">Nuevo chat</div>
-      <div class="mode" id="mode" title="Rápido: responde en 1-2 s · Avanzado: más profundo, puede tardar">
-        <button data-m="rapido">Rápido</button><button data-m="avanzado">Avanzado</button><span class="mode-pill"></span>
+      <div class="top-controls">
+        <select class="top-select" id="motorSelect" title="Motor de IA">
+          <option value="gemini">Gemini</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="grok">Grok</option>
+        </select>
+        <select class="top-select" id="personaSelect" title="Personalidad de respuesta">
+          <option value="default">Equilibrado</option>
+          <option value="directo">Directo</option>
+          <option value="tutor">Tutor</option>
+          <option value="codigo">Código Pro</option>
+          <option value="creativo">Creativo</option>
+        </select>
+        <div class="mode" id="mode" title="Rápido: responde en 1-2 s · Avanzado: más profundo, puede tardar">
+          <button data-m="rapido">Rápido</button><button data-m="avanzado">Avanzado</button><span class="mode-pill"></span>
+        </div>
       </div>
     </header>
 
@@ -180,21 +219,16 @@
       <div class="welcome" id="welcome">
         <div class="orb orb-xl" id="heroOrb"></div>
         <h1><span id="saludo">Hola</span>, <span class="accent">{{ usuario.nombre.split(' ')[0]|capitalize }}</span></h1>
-        <p class="welcome-sub">Pregúntame, háblame, crea imágenes o enséñame tu pantalla.</p>
+        <p class="welcome-sub">Pregúntame, crea archivos Word/Excel/PDF, genera imágenes o enséñame tu pantalla.</p>
         <div class="cards">
-          <button class="card" data-q="Mira mi pantalla y dime qué ves">
-            <span class="card-ic"><svg><use href="#i-screen"/></svg></span><b>Mirar mi pantalla</b><small>Analiza lo que tienes abierto ahora</small></button>
+          <button class="card" data-q="Crea un Excel con un presupuesto mensual personal y fórmulas">
+            <span class="card-ic"><svg><use href="#i-file"/></svg></span><b>Crear Word / Excel / PDF</b><small>Documentos y hojas reales descargables</small></button>
           <button class="card" data-q="Genera una imagen de un estadio de fútbol futurista de noche">
             <span class="card-ic"><svg><use href="#i-bulb"/></svg></span><b>Crear una imagen</b><small>Ilustraciones, logos y arte con IA</small></button>
-          <button class="card" data-q="Ayúdame a organizar mi semana con bloques de tiempo">
-            <span class="card-ic"><svg><use href="#i-cal"/></svg></span><b>Organizar mi semana</b><small>Plan por bloques de tiempo</small></button>
-          {% if apps_locales %}
-          <button class="card" data-q="Abre YouTube">
-            <span class="card-ic"><svg><use href="#i-rocket"/></svg></span><b>Abrir una app</b><small>"Abre YouTube", "abre la calculadora"…</small></button>
-          {% else %}
-          <button class="card" data-q="¿Qué recuerdas de mí?">
-            <span class="card-ic"><svg><use href="#i-memory"/></svg></span><b>Mi memoria</b><small>¿Qué sabe JLG AI de ti?</small></button>
-          {% endif %}
+          <button class="card" data-q="Mira mi pantalla y dime qué ves">
+            <span class="card-ic"><svg><use href="#i-screen"/></svg></span><b>Mirar mi pantalla</b><small>Analiza lo que tienes abierto ahora</small></button>
+          <button class="card" data-q="Recuérdame en 15 minutos revisar mis pendientes">
+            <span class="card-ic"><svg><use href="#i-cal"/></svg></span><b>Recordatorio por voz</b><small>Alarmas y temporizadores con alerta hablada</small></button>
         </div>
       </div>
       <div class="messages" id="messages"></div>
@@ -202,7 +236,7 @@
 
     <footer class="dock-wrap">
       <div class="dock" id="dock">
-        <div class="status-badges">
+        <div class="status-badges" id="statusBadges">
           <div class="hf-badge" id="hfBadge" hidden>
             <span class="hf-dot"></span>
             <span id="hfLabel">Manos libres · habla y se enviará solo</span>
@@ -213,6 +247,7 @@
             <span>Viendo tu pantalla · se enviará con tu mensaje</span>
             <button type="button" class="badge-stop" id="stopScreenBtn">Detener</button>
           </div>
+          <div id="remindersContainer" style="display:contents"></div>
         </div>
         <div class="attach-preview" id="attachPreview" hidden>
           <div class="attach-thumb" id="attachThumb"></div>
@@ -264,7 +299,6 @@ const renderMD = (t) => {
   catch { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
 };
 
-// Saludo según la hora
 const h = new Date().getHours();
 $('#saludo').textContent = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
 
@@ -273,6 +307,83 @@ async function api(url, opts = {}) {
   if (r.status === 401) { location.href = '/login'; return; }
   return r.json();
 }
+
+// ---------------------------------------------------------- recordatorios con alarma hablada
+let recordatorios = JSON.parse(localStorage.getItem('jlg-recordatorios') || '[]');
+
+function guardarRecordatorios() {
+  localStorage.setItem('jlg-recordatorios', JSON.stringify(recordatorios));
+}
+
+function sonarAlarma() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523.25, 659.25, 783.99].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.18, ctx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.36);
+    });
+  } catch {}
+}
+
+function agregarRecordatorio(data) {
+  let venceEn = Date.now() + 60000;
+  if (data.segundos) {
+    venceEn = Date.now() + Number(data.segundos) * 1000;
+  } else if (data.hora_reloj) {
+    const [hh, mm] = data.hora_reloj.split(':').map(Number);
+    const d = new Date();
+    d.setHours(hh, mm, 0, 0);
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+    venceEn = d.getTime();
+  }
+  recordatorios.push({ id: Date.now() + Math.random(), texto: data.texto || 'Recordatorio', venceEn });
+  guardarRecordatorios();
+  pintarRecordatorios();
+}
+
+function pintarRecordatorios() {
+  const cont = $('#remindersContainer');
+  if (!cont) return;
+  const ahoraMs = Date.now();
+  const activos = [];
+  for (const r of recordatorios) {
+    const rest = Math.ceil((r.venceEn - ahoraMs) / 1000);
+    if (rest <= 0) {
+      sonarAlarma();
+      leerEnVoz(`Recordatorio: ${r.texto}`);
+      burbujaModelo(`⏰ **Recordatorio cumplido:** ${r.texto}`);
+      scrollAbajo(true);
+    } else {
+      activos.push(r);
+    }
+  }
+  if (activos.length !== recordatorios.length) {
+    recordatorios = activos;
+    guardarRecordatorios();
+  }
+  cont.innerHTML = recordatorios.map(r => {
+    const s = Math.max(0, Math.ceil((r.venceEn - ahoraMs) / 1000));
+    const min = Math.floor(s / 60);
+    const seg = String(s % 60).padStart(2, '0');
+    return `<div class="rem-badge"><span class="rem-dot"></span><span>⏰ ${r.texto} (${min}:${seg})</span>`
+      + `<button type="button" class="badge-stop" onclick="cancelarRecordatorio(${r.id})">✕</button></div>`;
+  }).join('');
+}
+
+window.cancelarRecordatorio = (id) => {
+  recordatorios = recordatorios.filter(r => r.id !== id);
+  guardarRecordatorios();
+  pintarRecordatorios();
+};
+setInterval(pintarRecordatorios, 1000);
 
 // ---------------------------------------------------------- barra lateral
 function grupoFecha(iso) {
@@ -387,10 +498,7 @@ async function iniciarPantalla() {
   }
   if (estaViendoPantalla()) return true;
   try {
-    screenStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { cursor: 'always' },
-      audio: false
-    });
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false });
     const track = screenStream.getVideoTracks()[0];
     track.addEventListener('ended', detenerPantalla);
 
@@ -398,10 +506,7 @@ async function iniciarPantalla() {
     screenVideo.srcObject = screenStream;
     screenVideo.muted = true;
     screenVideo.playsInline = true;
-    await new Promise((resolve) => {
-      screenVideo.onloadedmetadata = resolve;
-      setTimeout(resolve, 600);
-    });
+    await new Promise((resolve) => { screenVideo.onloadedmetadata = resolve; setTimeout(resolve, 600); });
     await screenVideo.play().catch(() => {});
     await new Promise((r) => setTimeout(r, 140));
 
@@ -414,36 +519,22 @@ async function iniciarPantalla() {
 }
 
 function detenerPantalla() {
-  if (screenStream) {
-    screenStream.getTracks().forEach(t => t.stop());
-    screenStream = null;
-  }
-  if (screenVideo) {
-    screenVideo.srcObject = null;
-    screenVideo = null;
-  }
+  if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+  if (screenVideo) { screenVideo.srcObject = null; screenVideo = null; }
   actualizarUIPantalla();
 }
 
 async function capturarFramePantalla() {
   if (!estaViendoPantalla() || !screenVideo) return null;
-  const vw = screenVideo.videoWidth;
-  const vh = screenVideo.videoHeight;
+  const vw = screenVideo.videoWidth, vh = screenVideo.videoHeight;
   if (!vw || !vh) return null;
-
-  const maxLado = 1600;
-  const escala = Math.min(1, maxLado / Math.max(vw, vh));
-  const w = Math.round(vw * escala);
-  const h = Math.round(vh * escala);
-
+  const escala = Math.min(1, 1600 / Math.max(vw, vh));
+  const w = Math.round(vw * escala), h = Math.round(vh * escala);
   const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = w; canvas.height = h;
   canvas.getContext('2d').drawImage(screenVideo, 0, 0, w, h);
-
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88));
-  if (!blob) return null;
-  return new File([blob], 'captura-pantalla.jpg', { type: 'image/jpeg' });
+  return blob ? new File([blob], 'captura-pantalla.jpg', { type: 'image/jpeg' }) : null;
 }
 
 function pideVerPantalla(texto) {
@@ -452,10 +543,7 @@ function pideVerPantalla(texto) {
     || /\bque\s+(ves|hay|aparece|sale)\s+en\s+(mi\s+|la\s+)?pantalla\b/.test(t);
 }
 
-$('#screenBtn').onclick = async () => {
-  if (estaViendoPantalla()) detenerPantalla();
-  else await iniciarPantalla();
-};
+$('#screenBtn').onclick = async () => { estaViendoPantalla() ? detenerPantalla() : await iniciarPantalla(); };
 $('#stopScreenBtn').onclick = detenerPantalla;
 
 // ---------------------------------------------------------- mensajes
@@ -529,9 +617,13 @@ function pintar(row, texto) {
     pre.prepend(bar);
   });
   md.querySelectorAll('a').forEach(a => {
-    a.target = '_blank';
-    a.rel = 'noopener';
-    if (a.getAttribute('href')?.includes('descargar=1')) a.setAttribute('download', '');
+    const href = a.getAttribute('href') || '';
+    if (href.startsWith('/api/archivos/') || href.includes('descargar=1')) {
+      a.setAttribute('download', '');
+    } else {
+      a.target = '_blank';
+      a.rel = 'noopener';
+    }
   });
 }
 
@@ -547,7 +639,7 @@ function leerEnVoz(texto, btn, alTerminar) {
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/https?:\/\/\S+/g, '')
-    .replace(/[*#_`>|⬇️]/g, '')
+    .replace(/[*#_`>|⬇️⏰]/g, '')
     .trim();
 
   if (!limpio) {
@@ -645,6 +737,8 @@ async function enviar() {
   if (file) fd.append('file', file, file.name || 'imagen-pegada.png');
   if (state.convId) fd.append('conversacion_id', state.convId);
   fd.append('modo', modo);
+  fd.append('motor', $('#motorSelect').value);
+  fd.append('personalidad', $('#personaSelect').value);
 
   input.value = ''; input.style.height = 'auto';
   quitarAdjunto();
@@ -673,6 +767,11 @@ async function enviar() {
       let destino = urlAbrir;
       try { destino = decodeURIComponent(urlAbrir); } catch {}
       window.open(destino, '_blank', 'noopener,noreferrer');
+    }
+
+    const recHeader = res.headers.get('X-Recordatorio');
+    if (recHeader) {
+      try { agregarRecordatorio(JSON.parse(decodeURIComponent(recHeader))); } catch {}
     }
 
     const reader = res.body.getReader();
@@ -852,7 +951,7 @@ async function empezarOnda(stream) {
       rafOnda = requestAnimationFrame(tick);
     };
     tick();
-  } catch { /* la onda es decorativa: si falla, el dictado sigue */ }
+  } catch {}
 }
 
 function pararOnda() {
@@ -907,7 +1006,6 @@ async function iniciarMic() {
   }
 }
 
-// Respaldo (Firefox o navegadores sin Web Speech API): grabar y transcribir con Gemini
 async function iniciarGrabacion() {
   if (reconociendo || state.busy) return;
   try {
@@ -928,11 +1026,8 @@ async function iniciarGrabacion() {
       if (r.texto && r.texto.trim()) {
         input.value = (input.value ? input.value + ' ' : '') + r.texto.trim();
         input.dispatchEvent(new Event('input'));
-        if (handsFree) {
-          enviar();
-        } else {
-          input.focus();
-        }
+        if (handsFree) enviar();
+        else input.focus();
       } else if (handsFree && !state.busy) {
         actualizarEstadoManosLibres('Escuchando · habla y se enviará solo');
         iniciarMic();
@@ -998,7 +1093,7 @@ $('#clearMemory').onclick = async () => {
   cargarMemoria();
 };
 
-// ---------------------------------------------------------- modo Rápido / Avanzado
+// ---------------------------------------------------------- modo, motor y personalidad
 let modo = localStorage.getItem('jlg-modo') || 'rapido';
 function ponerModo(m) {
   modo = m; localStorage.setItem('jlg-modo', m);
@@ -1008,9 +1103,17 @@ function ponerModo(m) {
 document.querySelectorAll('#mode button').forEach(b => b.onclick = () => ponerModo(b.dataset.m));
 ponerModo(modo);
 
+const motorSel = $('#motorSelect');
+const personaSel = $('#personaSelect');
+motorSel.value = localStorage.getItem('jlg-motor') || 'gemini';
+personaSel.value = localStorage.getItem('jlg-persona') || 'default';
+motorSel.onchange = () => localStorage.setItem('jlg-motor', motorSel.value);
+personaSel.onchange = () => localStorage.setItem('jlg-persona', personaSel.value);
+
 // ---------------------------------------------------------- inicio
 cargarConversaciones();
 contarMemoria();
+pintarRecordatorios();
 if (new URLSearchParams(location.search).get('voz') === '1') {
   setTimeout(() => activarManosLibres(), 350);
 } else {
