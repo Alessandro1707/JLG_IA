@@ -426,7 +426,6 @@ def detectar_recordatorio(texto):
         if segundos <= 0 or segundos > 86400 * 7:
             return None, None
 
-        # Extraer tarea respetando mayúsculas originales
         tarea = re.sub(
             r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
             r"(?:recuérdame|recuerdame|recordarme|avísame|avisame|avisarme|pon\s+(?:un\s+|una\s+)?(?:temporizador|alarma|recordatorio)\s+(?:de|en))\s+"
@@ -485,120 +484,38 @@ def limpiar_latin1(texto):
     return texto.encode("latin-1", errors="ignore").decode("latin-1")
 
 
-def detectar_solicitud_imagen(texto):
+def detectar_solicitud_archivo(texto):
+    """Detecta si el usuario pide crear un archivo Word (.docx), Excel (.xlsx) o PDF (.pdf)."""
     if not texto:
-        return None
+        return None, None
     original = texto.strip()
     limpio = re.sub(r"[.!?¡¿,;]+$", "", sin_tildes(original.lower())).strip()
 
-    m1 = re.match(
+    m = re.match(
         r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
-        r"(?:genera|generar|generame|crea|crear|creame|haz|has|hacer|hazme|hasme|disena|disenar|disename|pinta|pintame)\s+"
-        r"(?:una?\s+|el\s+|la\s+)?"
-        r"(imagen|foto|fotografia|ilustracion|dibujo|logo|logotipo|icono|avatar|wallpaper|fondo\s+de\s+pantalla|retrato|poster|banner|portada)\b\s*"
-        r"(?:de\s+|sobre\s+|con\s+|para\s+)?(.*)$",
+        r"(?:crea|crear|creame|genera|generar|generame|haz|has|hacer|hazme|hasme|redacta|redactar|redactame|arma|armar|armame|elabora|elaborar)\s+"
+        r"(?:un\s+|una\s+|el\s+|la\s+)?"
+        r"(?:documento\s+(?:de\s+|en\s+)?|archivo\s+(?:de\s+|en\s+)?|hoja\s+de\s+calculo\s+(?:de\s+|en\s+)?|plantilla\s+(?:de\s+|en\s+)?|tabla\s+(?:de\s+|en\s+)?|informe\s+(?:de\s+|en\s+)?)?"
+        r"(word|docx|excel|xlsx|pdf)\b(?:\s+(?:de|sobre|con|para|acerca\s+de)\s+)?(.*)$",
         limpio,
     )
-    if m1:
-        tipo = m1.group(1).strip()
-        desc = re.sub(
-            r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
-            r"(?:genera|generar|genérame|generame|crea|crear|créame|creame|haz|has|hacer|hazme|hasme|diseña|disena|diseñar|disenar|diseñame|disename|pinta|píntame|pintame)\s+"
-            r"(?:una?\s+|el\s+|la\s+)?"
-            r"(?:imagen|foto|fotografía|fotografia|ilustración|ilustracion|dibujo|logo|logotipo|ícono|icono|avatar|wallpaper|fondo\s+de\s+pantalla|retrato|póster|poster|banner|portada)\b\s*"
-            r"(?:de\s+|sobre\s+|con\s+|para\s+)?",
-            "",
-            original,
-            flags=re.IGNORECASE,
-        ).strip()
-        if desc.lower() in ("", "cualquiera", "random", "aleatoria", "al azar"):
-            desc = "un paisaje digital futurista vibrante con luces neón y detalles cinematográficos"
-        if tipo in ("logo", "logotipo", "icono", "avatar", "wallpaper", "fondo de pantalla", "poster", "banner", "portada"):
-            return f"{tipo} de {desc}"
-        return desc
+    if not m:
+        return None, None
 
-    m2 = re.match(
-        r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
-        r"(?:dibuja|dibujar|dibujame|ilustra|ilustrar|ilustrame)\s+"
-        r"(?:una?\s+|el\s+|la\s+)?(.+)$",
-        limpio,
-    )
-    if m2:
-        return re.sub(
-            r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
-            r"(?:dibuja|dibujar|dibújame|dibujame|ilustra|ilustrar|ilústrame|ilustrame)\s+",
-            "",
-            original,
-            flags=re.IGNORECASE,
-        ).strip()
+    fmt = m.group(1)
+    tipo = "docx" if fmt in ("word", "docx") else ("xlsx" if fmt in ("excel", "xlsx") else "pdf")
+    tema = re.sub(
+        r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
+        r"(?:crea|crear|créame|creame|genera|generar|genérame|generame|haz|has|hacer|hazme|hasme|redacta|redactar|redáctame|redactame|arma|armar|ármame|armame|elabora|elaborar)\s+"
+        r"(?:un\s+|una\s+|el\s+|la\s+)?"
+        r"(?:documento\s+(?:de\s+|en\s+)?|archivo\s+(?:de\s+|en\s+)?|hoja\s+de\s+cálculo\s+(?:de\s+|en\s+)?|hoja\s+de\s+calculo\s+(?:de\s+|en\s+)?|plantilla\s+(?:de\s+|en\s+)?|tabla\s+(?:de\s+|en\s+)?|informe\s+(?:de\s+|en\s+)?)?"
+        r"(?:word|docx|excel|xlsx|pdf)\b(?:\s+(?:de|sobre|con|para|acerca\s+de)\s+)?",
+        "",
+        original,
+        flags=re.IGNORECASE,
+    ).strip() or "Documento generado"
 
-    return None
-
-
-def generar_imagen_ia(prompt):
-    errores = []
-    modelos_img = []
-    for m in [MODELO_IMAGEN, "imagen-3.0-generate-002", "imagen-3.0-fast-generate-001"]:
-        if m and m not in modelos_img:
-            modelos_img.append(m)
-
-    for m in modelos_img:
-        try:
-            res = client.models.generate_images(
-                model=m,
-                prompt=prompt,
-                config=types.GenerateImagesConfig(number_of_images=1, output_mime_type="image/png"),
-            )
-            if getattr(res, "generated_images", None):
-                raw_data = res.generated_images[0].image.image_bytes
-                if isinstance(raw_data, str):
-                    raw_data = base64.b64decode(raw_data)
-                if raw_data:
-                    nombre = f"img_{int(time.time())}_{secrets.token_hex(4)}.png"
-                    with open(os.path.join(GENERATED_DIR, nombre), "wb") as f:
-                        f.write(raw_data)
-                    return nombre, None
-        except Exception as e:
-            errores.append(f"{m}: {str(e)[:120]}")
-
-    for m in ["gemini-2.5-flash-image", "gemini-2.0-flash-exp-image-generation"]:
-        try:
-            res = client.models.generate_content(
-                model=m,
-                contents=f"Genera una imagen de alta calidad: {prompt}",
-                config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
-            )
-            for cand in (getattr(res, "candidates", None) or []):
-                for part in (getattr(cand.content, "parts", None) or []):
-                    inline = getattr(part, "inline_data", None)
-                    if inline and getattr(inline, "data", None):
-                        raw_data = inline.data
-                        if isinstance(raw_data, str):
-                            raw_data = base64.b64decode(raw_data)
-                        mime = getattr(inline, "mime_type", "") or "image/png"
-                        ext = "jpg" if "jpeg" in mime or "jpg" in mime else "png"
-                        nombre = f"img_{int(time.time())}_{secrets.token_hex(4)}.{ext}"
-                        with open(os.path.join(GENERATED_DIR, nombre), "wb") as f:
-                            f.write(raw_data)
-                        return nombre, None
-        except Exception as e:
-            errores.append(f"{m}: {str(e)[:120]}")
-
-    # Respaldo gratuito sin clave si la cuota gratuita de Google bloquea Imagen
-    try:
-        url_fb = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1024&height=1024&nologo=true"
-        req = Request(url_fb, headers={"User-Agent": "Mozilla/5.0"})
-        with urlopen(req, timeout=25) as resp:
-            raw_data = resp.read()
-        if raw_data and len(raw_data) > 2000:
-            nombre = f"img_{int(time.time())}_{secrets.token_hex(4)}.jpg"
-            with open(os.path.join(GENERATED_DIR, nombre), "wb") as f:
-                f.write(raw_data)
-            return nombre, None
-    except Exception as e:
-        errores.append(f"fallback: {str(e)[:120]}")
-
-    return None, (errores[0] if errores else "No se pudo generar la imagen.")
+    return tipo, tema
 
 
 def generar_archivo_ia(tipo, tema, u):
@@ -751,24 +668,26 @@ def detectar_solicitud_imagen(texto):
 
     m1 = re.match(
         r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
-        r"(?:genera|generar|generame|crea|crear|creame|haz|hacer|hazme|disena|disenar|disename)\s+"
+        r"(?:genera|generar|generame|crea|crear|creame|haz|has|hacer|hazme|hasme|disena|disenar|disename|pinta|pintame)\s+"
         r"(?:una?\s+|el\s+|la\s+)?"
-        r"(imagen|foto|fotografia|ilustracion|dibujo|logo|logotipo|icono|avatar|wallpaper|fondo\s+de\s+pantalla|retrato|poster|banner|portada)\s+"
-        r"(?:de\s+|sobre\s+|con\s+|para\s+)?(.+)$",
+        r"(imagen|foto|fotografia|ilustracion|dibujo|logo|logotipo|icono|avatar|wallpaper|fondo\s+de\s+pantalla|retrato|poster|banner|portada)\b\s*"
+        r"(?:de\s+|sobre\s+|con\s+|para\s+)?(.*)$",
         limpio,
     )
     if m1:
         tipo = m1.group(1).strip()
         desc = re.sub(
             r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
-            r"(?:genera|generar|genérame|generame|crea|crear|créame|creame|haz|hacer|hazme|diseña|disena|diseñar|disenar|diseñame|disename)\s+"
+            r"(?:genera|generar|genérame|generame|crea|crear|créame|creame|haz|has|hacer|hazme|hasme|diseña|disena|diseñar|disenar|diseñame|disename|pinta|píntame|pintame)\s+"
             r"(?:una?\s+|el\s+|la\s+)?"
-            r"(?:imagen|foto|fotografía|fotografia|ilustración|ilustracion|dibujo|logo|logotipo|ícono|icono|avatar|wallpaper|fondo\s+de\s+pantalla|retrato|póster|poster|banner|portada)\s+"
+            r"(?:imagen|foto|fotografía|fotografia|ilustración|ilustracion|dibujo|logo|logotipo|ícono|icono|avatar|wallpaper|fondo\s+de\s+pantalla|retrato|póster|poster|banner|portada)\b\s*"
             r"(?:de\s+|sobre\s+|con\s+|para\s+)?",
             "",
             original,
             flags=re.IGNORECASE,
         ).strip()
+        if desc.lower() in ("", "cualquiera", "random", "aleatoria", "al azar"):
+            desc = "un paisaje digital futurista vibrante con luces neón y detalles cinematográficos"
         if tipo in ("logo", "logotipo", "icono", "avatar", "wallpaper", "fondo de pantalla", "poster", "banner", "portada"):
             return f"{tipo} de {desc}"
         return desc
@@ -815,7 +734,7 @@ def generar_imagen_ia(prompt):
                         f.write(raw_data)
                     return nombre, None
         except Exception as e:
-            errores.append(f"{m}: {str(e)[:140]}")
+            errores.append(f"{m}: {str(e)[:120]}")
 
     for m in ["gemini-2.5-flash-image", "gemini-2.0-flash-exp-image-generation"]:
         try:
@@ -838,7 +757,21 @@ def generar_imagen_ia(prompt):
                             f.write(raw_data)
                         return nombre, None
         except Exception as e:
-            errores.append(f"{m}: {str(e)[:140]}")
+            errores.append(f"{m}: {str(e)[:120]}")
+
+    # Respaldo gratuito sin clave si la cuota gratuita de Google bloquea Imagen
+    try:
+        url_fb = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1024&height=1024&nologo=true"
+        req = Request(url_fb, headers={"User-Agent": "Mozilla/5.0"})
+        with urlopen(req, timeout=25) as resp:
+            raw_data = resp.read()
+        if raw_data and len(raw_data) > 2000:
+            nombre = f"img_{int(time.time())}_{secrets.token_hex(4)}.jpg"
+            with open(os.path.join(GENERATED_DIR, nombre), "wb") as f:
+                f.write(raw_data)
+            return nombre, None
+    except Exception as e:
+        errores.append(f"fallback: {str(e)[:120]}")
 
     return None, (errores[0] if errores else "No se pudo generar la imagen.")
 
@@ -1330,40 +1263,9 @@ def fuentes_markdown(resultados):
     return "\n\n---\n**Fuentes:** " + " · ".join(enlaces) if enlaces else ""
 
 
+# ---------------------------------------------------------------- chat principal
 @app.post("/api/chat")
 @login_requerido
-def detectar_solicitud_archivo(texto):
-    """Detecta si el usuario pide crear un archivo Word (.docx), Excel (.xlsx) o PDF (.pdf)."""
-    if not texto:
-        return None, None
-    original = texto.strip()
-    limpio = re.sub(r"[.!?¡¿,;]+$", "", sin_tildes(original.lower())).strip()
-
-    m = re.match(
-        r"^(?:por favor\s+)?(?:puedes\s+|podrias\s+)?"
-        r"(?:crea|crear|creame|genera|generar|generame|haz|has|hacer|hazme|hasme|redacta|redactar|redactame|arma|armar|armame|elabora|elaborar)\s+"
-        r"(?:un\s+|una\s+|el\s+|la\s+)?"
-        r"(?:documento\s+(?:de\s+|en\s+)?|archivo\s+(?:de\s+|en\s+)?|hoja\s+de\s+calculo\s+(?:de\s+|en\s+)?|plantilla\s+(?:de\s+|en\s+)?|tabla\s+(?:de\s+|en\s+)?|informe\s+(?:de\s+|en\s+)?)?"
-        r"(word|docx|excel|xlsx|pdf)\b(?:\s+(?:de|sobre|con|para|acerca\s+de)\s+)?(.*)$",
-        limpio,
-    )
-    if not m:
-        return None, None
-
-    fmt = m.group(1)
-    tipo = "docx" if fmt in ("word", "docx") else ("xlsx" if fmt in ("excel", "xlsx") else "pdf")
-    tema = re.sub(
-        r"^(?:por favor\s+)?(?:puedes\s+|podrías\s+|podrias\s+)?"
-        r"(?:crea|crear|créame|creame|genera|generar|genérame|generame|haz|has|hacer|hazme|hasme|redacta|redactar|redáctame|redactame|arma|armar|ármame|armame|elabora|elaborar)\s+"
-        r"(?:un\s+|una\s+|el\s+|la\s+)?"
-        r"(?:documento\s+(?:de\s+|en\s+)?|archivo\s+(?:de\s+|en\s+)?|hoja\s+de\s+cálculo\s+(?:de\s+|en\s+)?|hoja\s+de\s+calculo\s+(?:de\s+|en\s+)?|plantilla\s+(?:de\s+|en\s+)?|tabla\s+(?:de\s+|en\s+)?|informe\s+(?:de\s+|en\s+)?)?"
-        r"(?:word|docx|excel|xlsx|pdf)\b(?:\s+(?:de|sobre|con|para|acerca\s+de)\s+)?",
-        "",
-        original,
-        flags=re.IGNORECASE,
-    ).strip() or "Documento generado"
-
-    return tipo, tema
 def chat():
     u = usuario_actual()
     texto = request.form.get("message", "").strip()
